@@ -1,0 +1,62 @@
+#------------------------------------------------------------------------------
+# en: Threading Configuration | ru: Конфигурация потоков
+#------------------------------------------------------------------------------
+# en: Controls parallel execution capacity (min: 1) | ru: Управление количеством параллельных выполнений (минимум: 1)
+threads: 1
+
+
+#------------------------------------------------------------------------------
+# Network Settings
+#------------------------------------------------------------------------------
+# Somnia Testnet RPC endpoint
+somnia_rpc: https://dream-rpc.somnia.network  
+
+# Somnia Testnet Explorer
+somnia_explorer: https://somnia-testnet.socialscan.io/
+
+
+#------------------------------------------------------------------------------
+# en: Timing Settings | ru: Настройки времени
+#------------------------------------------------------------------------------
+# en: Initial delay range before starting operations (seconds) | ru: Диапазон начальной задержки перед началом выполнения (секунды)
+delay_before_start:
+    min: 0
+    max: 0
+
+
+#------------------------------------------------------------------------------
+# en: Api keys for captcha solving requests  | ru: Api ключи для запросов на решение капчи 
+#------------------------------------------------------------------------------
+
+# https://capmonster.cloud
+cap_monster: ""
+
+# https://2captcha.com/
+two_captcha: ""
+
+# https://www.capsolver.com/
+capsolver: ""
+
+
+#------------------------------------------------------------------------------
+# en: List of tokens in the network Somnia Devnet | ru: Список токенов в сети Somnia Devnet
+#------------------------------------------------------------------------------
+
+tokens: &tokens
+  - name: STT
+    address: ""
+  - name: WSTT
+    address: ""
+  - name: USDT
+    address: ""
+  - name: WBTC
+    address: ""
+
+
+#------------------------------------------------------------------------------
+# en: MODULES CONFIGURATION  | ru: КОНФИГУРАЦИИ МОДУЛЕЙ
+#------------------------------------------------------------------------------
+
+
+# en: Referral code for standard account registration | ru: Реферальный код для стандартной регистрации аккаунтов
+referral_code: ""
