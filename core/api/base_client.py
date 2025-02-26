@@ -218,7 +218,6 @@ class BaseAPIClient:
         """
         error_str = str(error).lower()
         
-        # Расширенный список ошибок, требующих пересоздания сессии
         session_reset_errors = [
             "curlm already closed", 
             "curl error", 
@@ -235,7 +234,7 @@ class BaseAPIClient:
         if any(err in error_str for err in session_reset_errors):
             log.warning(f"Detected connection error: {error_str}. Restarting session.")
             await self.close()
-            await asyncio.sleep(1.5)  # Увеличенная пауза для стабилизации соединения
+            await asyncio.sleep(1.5)
             await self.initialize()
             return True
             
@@ -357,10 +356,10 @@ class BaseAPIClient:
         custom_timeout: Optional[float] = None
     ) -> Response:
         """
-        Отправить запрос с расширенной обработкой ошибок и адаптивными тайм-аутами.
+        Send a request with extended error handling and adaptive timeouts.
         
         Args:
-            custom_timeout: Пользовательский тайм-аут для особо тяжелых запросов
+            custom_timeout: User-defined timeout for heavy requests
         """
         async with self._session_lock:
             await self._ensure_session()
@@ -370,11 +369,9 @@ class BaseAPIClient:
             await self._maybe_rotate_session()
             await self._add_random_delay()
 
-            # Определяем базовый тайм-аут для запроса
             is_stats_request = method and "stats" in method
             is_heavy_request = method and any(keyword in method for keyword in ["auth", "users", "socials"])
             
-            # Адаптивные тайм-ауты в зависимости от типа запроса
             base_timeout = custom_timeout or (
                 self.config.DEFAULT_TIMEOUT[1] + 15 if is_stats_request else
                 self.config.DEFAULT_TIMEOUT[1] + 10 if is_heavy_request else
@@ -393,8 +390,7 @@ class BaseAPIClient:
 
             last_error = None
             for attempt in range(max_retries):
-                # Постепенно увеличиваем тайм-аут с каждой попыткой
-                adaptive_timeout = base_timeout * (1 + attempt * 0.2)  # +20% с каждой попыткой
+                adaptive_timeout = base_timeout * (1 + attempt * 0.2)
                 
                 log.debug(f"Request to {request_url} (attempt {attempt+1}/{max_retries}) with timeout {adaptive_timeout:.2f}s")
                 
@@ -404,7 +400,6 @@ class BaseAPIClient:
                         timeout=adaptive_timeout
                     )
                     
-                    # Проверка на обработку ответов сервера с кодами 429 (Too Many Requests)
                     if response.status_code == 429:
                         retry_after = response.headers.get('Retry-After', retry_delay * 2)
                         retry_after = float(retry_after) if isinstance(retry_after, str) and retry_after.isdigit() else retry_delay * 2
@@ -412,7 +407,6 @@ class BaseAPIClient:
                         await asyncio.sleep(retry_after)
                         continue
                     
-                    # Обработка успешного ответа
                     await self._manage_cookies(response)
                     self.last_url = request_url
                     
@@ -423,9 +417,7 @@ class BaseAPIClient:
                             last_error = e
                             log.warning(f"Response status error (attempt {attempt+1}/{max_retries}): {str(e)}")
                             
-                            # Особая обработка для разных типов ошибок
                             if isinstance(e, SessionRateLimited):
-                                # Возможно, наша сессия заблокирована, лучше создать новую
                                 await self.close()
                                 await asyncio.sleep(retry_delay * 2)
                                 await self.initialize()
@@ -435,7 +427,6 @@ class BaseAPIClient:
                                 await asyncio.sleep(backoff)
                             continue
                     
-                    # Проверяем содержимое ответа для JSON-ответов
                     if 'application/json' in response.headers.get('Content-Type', ''):
                         try:
                             response_data = response.json()
@@ -451,7 +442,6 @@ class BaseAPIClient:
                             log.warning(f"API error in response (attempt {attempt+1}/{max_retries}): {str(e)}")
                             if attempt == max_retries - 1:
                                 raise
-                            # Для API ошибок делаем более короткую задержку
                             await asyncio.sleep(retry_delay)
                             continue
                             
@@ -461,9 +451,8 @@ class BaseAPIClient:
                     last_error = e
                     log.warning(f"Request timed out (attempt {attempt+1}/{max_retries}): {request_url} - Timeout: {adaptive_timeout:.2f}s")
                     
-                    # Пересоздаем сессию при тайм-ауте
                     await self.close()
-                    await asyncio.sleep(1.5)  # Небольшая пауза перед пересозданием сессии
+                    await asyncio.sleep(1.5)    
                     await self.initialize()
                     
                 except aiohttp.ClientError as e:
@@ -480,18 +469,15 @@ class BaseAPIClient:
                         
                     if "certificate" in str(error).lower():
                         log.warning("SSL certificate error detected, continuing anyway")
-                        # Может потребоваться установка verify=False в сессии
                         continue
                         
                     if attempt == max_retries - 1:
                         raise
 
-                # Экспоненциальная отсрочка между попытками с элементом случайности
                 backoff = retry_delay * (2 ** attempt) * (0.8 + random.random() * 0.4)
                 log.info(f"Waiting {backoff:.2f}s before retry...")
                 await asyncio.sleep(backoff)
 
-            # Если мы здесь, значит все попытки исчерпаны
             error_msg = f"Failed after {max_retries} attempts"
             if last_error:
                 error_msg += f". Last error: {str(last_error)}"
@@ -516,30 +502,28 @@ class BaseAPIClient:
 
     @staticmethod
     async def _verify_response(response_data: Union[Dict, List]) -> None:
-        """Проверка данных API-ответа на наличие ошибок.
+        """Check the API response data for errors.
 
         Args:
-            response_data (Union[Dict, List]): Разобранные данные ответа.
+            response_data (Union[Dict, List]): Parsed response data.
 
         Raises:
-            APIError: Если ответ содержит индикатор ошибки.
+            APIError: If the response contains an error indicator.
         """
         if not isinstance(response_data, dict):
             return
             
-        # Расширенные проверки для разных форматов ошибок
         error_checks = [
             ("status", lambda x: x is False or str(x).lower() == "failed"),
             ("success", lambda x: x is False),
-            ("error", lambda x: x is not None and x),  # Проверяем, что error не None и не пустой
-            ("errors", lambda x: x and len(x) > 0),  # Проверяем наличие списка ошибок
+            ("error", lambda x: x is not None and x),
+            ("errors", lambda x: x and len(x) > 0),
             ("statusCode", lambda x: isinstance(x, int) and x not in (200, 201, 202, 204)),
             ("code", lambda x: isinstance(x, int) and x >= 400)
         ]
         
         for key, check in error_checks:
             if key in response_data and check(response_data[key]):
-                # Извлечение подробной информации об ошибке
                 error_details = response_data.get("message", "")
                 if not error_details and isinstance(response_data.get("errors"), list):
                     error_details = ", ".join(str(e) for e in response_data["errors"])
