@@ -183,7 +183,7 @@ class SomniaClient:
                 return self._me_info_cache.get("referralCode")
 
             return {
-                key: None for key in ['username', 'discordName', 'twitterName']
+                key: None for key in ['username', 'discordName', 'twitterName', 'telegramName']
                 if self._me_info_cache.get(key) is None
             }
 

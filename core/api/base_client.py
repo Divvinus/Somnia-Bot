@@ -439,7 +439,7 @@ class BaseAPIClient:
                             continue
                         except APIError as e:
                             last_error = e
-                            log.warning(f"API error in response (attempt {attempt+1}/{max_retries}): {str(e)}")
+                            log.warning(f"API error in response (attempt {attempt+1}/{max_retries}): {str(e)} | Link: {request_url}")
                             if attempt == max_retries - 1:
                                 raise
                             await asyncio.sleep(retry_delay)

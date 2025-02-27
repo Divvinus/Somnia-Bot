@@ -73,13 +73,19 @@ sleep_after_referral_bind = {"min_sec": 60, "max_sec": 120}
 sleep_after_username_creation = {"min_sec": 60, "max_sec": 120}
 
 """
+    en: Sleep after connecting a Telegram account
+    ru: Сон после подключения Telegram аккаунта
+"""
+sleep_after_telegram_connection = {"min_sec": 90, "max_sec": 120}
+
+"""
     en: Sleep after connecting a Discord account
     ru: Сон после подключения Discord аккаунта
 """
-sleep_after_discord_connection = {"min_sec": 120, "max_sec": 240}   
+sleep_after_discord_connection = {"min_sec": 120, "max_sec": 180}   
 
 """
     en: Sleep after connecting a Twitter account
     ru: Сон после подключения Twitter аккаунта
 """
-sleep_after_twitter_connection = {"min_sec": 30, "max_sec": 60}
+sleep_after_twitter_connection = {"min_sec": 5, "max_sec": 10}

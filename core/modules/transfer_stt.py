@@ -1,5 +1,6 @@
 import secrets
 from typing import Tuple, Union
+import random
 
 from eth_keys import keys
 from eth_utils import to_checksum_address
@@ -44,6 +45,7 @@ class TransferSTTModule(Wallet):
     def _calculate_transfer_amount(self, balance: float) -> Union[float, None]:
         """
         Determine transfer amount based on current balance.
+        Randomly selects amount from available options based on balance threshold.
         
         Args:
             balance: Current wallet balance in STT
@@ -51,13 +53,13 @@ class TransferSTTModule(Wallet):
         Returns:
             float or None: Transfer amount or None if balance insufficient
         """
-        amounts = {
-            0.01: 0.01,
-            0.005: 0.005,
-            0.001: 0.001
-        }
-        return next((amount for threshold, amount in amounts.items() 
-                    if balance > threshold), None)
+        if balance > 0.01:
+            return random.choice([0.01, 0.005, 0.001])
+        elif balance > 0.005:
+            return random.choice([0.005, 0.001])
+        elif balance > 0.001:
+            return 0.001
+        return None
     
     async def transfer_stt(self) -> Tuple[bool, str]:
         """

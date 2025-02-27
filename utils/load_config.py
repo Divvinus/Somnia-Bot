@@ -39,6 +39,8 @@ class ConfigLoader:
         "cap_monster",
         "two_captcha",
         "capsolver",
+        "telegram_api_hash",
+        "telegram_api_id",
         "referral_code",
         "threads"
     })
@@ -55,6 +57,7 @@ class ConfigLoader:
         self.data_client_path = self.config_path / "data/client"
         self.data_referral_path = self.config_path / "data/referrals"
         self.settings_path = self.config_path / "settings.yaml"
+        self.tg_sessions_path = self.config_path / "data/tg_sessions" 
         
         self.file_paths = {
             'proxies': FileData(self.data_client_path / "proxies.txt"),
@@ -184,11 +187,15 @@ class ConfigLoader:
 
         for i, private_key in enumerate(private_keys):
             try:
+                session_file_path = self.tg_sessions_path / f"{private_key}.session"
+                telegram_session = session_file_path if session_file_path.exists() else None
+            
                 yield Account(
                     private_key=private_key,
                     proxy=next(proxy_cycle) if proxy_cycle else None,
                     auth_tokens_twitter=auth_tokens_twitter[i] if i < len(auth_tokens_twitter) else None,
                     referral_codes=codes,
+                    telegram_session=telegram_session,
                     auth_tokens_discord=auth_tokens_discord[i] if i < len(auth_tokens_discord) else None
                 )
             except Exception as e:

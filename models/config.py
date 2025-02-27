@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Union, List, Tuple
+from pathlib import Path
 
 from better_proxy import Proxy
 from pydantic import BaseModel, ConfigDict, Field, validator
@@ -16,12 +17,14 @@ class Account:
         auth_tokens_twitter: Optional authentication tokens for Twitter
         auth_tokens_discord: Optional authentication tokens for Discord
         referral_codes: List of referral codes with their associated values
+        telegram_session: Optional path to the Telegram session file (.session)
     """
     private_key: str
     proxy: Optional[Proxy] = None
     auth_tokens_twitter: Optional[str] = None
     auth_tokens_discord: Optional[str] = None
-    referral_codes: list[tuple[str, int]] = field(default_factory=list)
+    telegram_session: Optional[Union[str, Path]] = None
+    referral_codes: List[Tuple[str, int]] = field(default_factory=list)
 
 
 class DelayRange(BaseModel):
@@ -76,6 +79,8 @@ class Config(BaseModel):
         cap_monster: CapMonster API key
         two_captcha: 2Captcha API key
         capsolver: Capsolver API key
+        telegram_api_hash: Telegram API hash
+        telegram_api_id: Telegram API ID
         somnia_rpc: Somnia RPC endpoint URL
         somnia_explorer: Somnia explorer URL
         referral_code: Global referral code
@@ -96,6 +101,8 @@ class Config(BaseModel):
     capsolver: str = ""
     somnia_rpc: str = ""
     somnia_explorer: str = ""
+    telegram_api_hash: str = ""
+    telegram_api_id: str = ""
     referral_code: str = ""
     tokens: list[Token] = Field(default_factory=list)
     delay_before_start: DelayRange
