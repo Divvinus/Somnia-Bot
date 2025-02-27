@@ -18,7 +18,7 @@
     <img src="https://img.shields.io/badge/Telegram-Contact-blue?style=for-the-badge&logo=telegram" alt="Telegram Contact">
 </a>
 <br>
-<b>Donations:</b> <code>0x15c27c9B32C7cbaE0cD4eB0f42f45F529bda8aE1</code>
+<b>Donations:</b> <code>0x75e5F8620aC4B397c625B5701719B3Dc2BeB5A2A</code>
 </div>
 
 
