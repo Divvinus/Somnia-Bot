@@ -248,6 +248,6 @@ class Logger:
 log = Logger(
     name="AppLogger",
     log_file=Path("logs/app.log"),
-    level=logging.INFO,
+    level=logging.DEBUG,
     rich_logging=True
 )

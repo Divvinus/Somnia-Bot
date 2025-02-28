@@ -1,7 +1,6 @@
 import asyncio
-import base64
 import hashlib
-import json
+import jwt
 import time
 
 import aiohttp
@@ -229,23 +228,26 @@ class TelegramClient(Wallet):
                 await asyncio.sleep(5)
 
     def _generate_user_data(self, me):
-        """Generate encoded user data."""
         current_time = int(time.time())
-        data_string = f"{me.id}:{me.first_name or ''}:{me.username or ''}:{current_time}"
-        hash_value = hashlib.sha256(data_string.encode()).hexdigest()
         
-        user_data = {
-            "id": me.id,
-            "first_name": me.first_name or "",
-            "username": me.username or "",
-            "auth_date": current_time,
-            "hash": hash_value
+        payload = {
+            "sub": int(me.id),
+            "first_name": str(me.first_name or ""),
+            "username": str(me.username or ""),
+            "iat": current_time,
+            "exp": current_time + 86400,
+            "auth_date": current_time
         }
         
-        encoded_user_data = base64.b64encode(json.dumps(user_data).encode()).decode()
-        log.success(f"Account {self.wallet_address} | Auth successful, encoded data generated")
+        SECRET_KEY = hashlib.sha256(str(self.wallet_address).encode()).hexdigest()
         
-        return encoded_user_data
+        token = jwt.encode(
+            payload, 
+            SECRET_KEY, 
+            algorithm='HS256'
+        )
+        
+        return token
 
     async def _cleanup(self):
         """Close all open sessions and connections."""

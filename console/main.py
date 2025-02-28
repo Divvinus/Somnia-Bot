@@ -28,46 +28,50 @@ class Console:
     """Enhanced console interface with animated elements and modern styling."""
     
     MODULES = (
-        "🔑 Get referral code",
-        "🏆 Account statistics",
-        "🤖 Recruiting referrals",
         "👤 Profile",
+        "🏆 Account statistics",
+        "🔑 Get referral code",
         "💰 Faucet",
         "💸 Transfer STT",
         "👥 Socials quests 1",
+        "👥 Socials quests 2",
+        "🤖 Recruiting referrals",
         "🚪 Exit",
     )
     
     MODULES_DATA = {
-        "🔑 Get referral code": "get_referral_code",
-        "🏆 Account statistics": "account_statistics",
-        "🤖 Recruiting referrals": "recruiting_referrals",
         "👤 Profile": "profile",
+        "🏆 Account statistics": "account_statistics",
+        "🔑 Get referral code": "get_referral_code",
         "💰 Faucet": "faucet",
         "💸 Transfer STT": "transfer_stt",
         "👥 Socials quests 1": "socials_quests_1",
+        "👥 Socials quests 2": "socials_quests_2",
+        "🤖 Recruiting referrals": "recruiting_referrals",
         "🚪 Exit": "exit"
     }
     
     MODULE_DESCRIPTIONS = {
-        "get_referral_code": "Get referral code for the account",
-        "account_statistics": "View detailed account metrics and progress",
-        "recruiting_referrals": "Automate referral acquisition process",
         "profile": "Set up profile and connect social accounts",
+        "account_statistics": "View detailed account metrics and progress",
+        "get_referral_code": "Record referral codes from your farm",
         "faucet": "Claim test tokens from the Somnia faucet",
         "transfer_stt": "Transfer STT tokens between wallets",
-        "socials_quests_1": "Complete social media tasks and earn rewards",
+        "socials_quests_1": "Fulfillment Socials Quests 1",
+        "socials_quests_2": "Fulfillment Socials Quests 2",
+        "recruiting_referrals": "Automatic recruiting referrals",
         "exit": "Exit the application"
     }
     
     MODULE_COLORS = {
-        "get_referral_code": "cyan",
+        "profile": "cyan",
         "account_statistics": "cyan",
-        "recruiting_referrals": "green",
-        "profile": "blue",
+        "get_referral_code": "cyan",
         "faucet": "yellow",
-        "transfer_stt": "magenta",
+        "transfer_stt": "yellow",
         "socials_quests_1": "red",
+        "socials_quests_2": "red",
+        "recruiting_referrals": "green",
         "exit": "white"
     }
 
@@ -76,7 +80,7 @@ class Console:
         self.rich_console = RichConsole()
         self._setup_styles()
         self.current_selection = 0
-        self.wallet_address = "0x15c27c9B32C7cbaE0cD4eB0f42f45F529bda8aE1"
+        self.wallet_address = "0x63F78ecCB360516C13Dd48CA3CA3f72eB3D4Fd3e"
 
     def _setup_styles(self) -> None:
         """Initialize advanced styling constants."""

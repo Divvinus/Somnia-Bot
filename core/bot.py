@@ -102,3 +102,11 @@ class SomniaBot:
         """
         module = SocialsQuest1Module(account)
         return await module.run()
+    
+    @staticmethod
+    async def process_socials_quests_2(account: Account) -> tuple[bool, str]:
+        """
+        Complete social media quests (set 2).
+        """
+        module = SocialsQuest2Module(account)
+        return await module.run()
