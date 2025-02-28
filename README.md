@@ -21,18 +21,18 @@
 <b>Donations:</b> <code>0x63F78ecCB360516C13Dd48CA3CA3f72eB3D4Fd3e</code>
 </div>
 
-
 A multifunctional bot for automating interactions with the Somnia Network testnet. Supports account registration, social media linking, quest completion, and token management.
 
 ## 🚀 Key Features
 
 - Automatic account registration and setup
   - Username creation and linking
-  - Discord and Twitter connection
+  - Discord, Telegram, and Twitter connection
   - Account activation
 - Social quest completion
   - Social media connection verification
   - Referral task completion
+  - Two-stage social quests support
 - Token management
   - Test token acquisition through faucet
   - STT token transfers
@@ -43,12 +43,19 @@ A multifunctional bot for automating interactions with the Somnia Network testne
   - Referral code saving and retrieval
   - Private key file recording
 
+## 🌐 Supported Networks
+
+- Somnia Network Testnet
+- Supports multiple wallets and proxy configurations
+- Compatible with EVM-based blockchain interactions
+
 ## 📋 System Requirements
 
 - Python 3.10 or higher
 - Windows/Linux
 - Discord account
 - Twitter account
+- Telegram account
 
 ## 🛠️ Installation
 
@@ -94,6 +101,13 @@ auth_token2
 discord_token1
 discord_token2
 ...
+```
+
+#### Telegram Sessions
+```
+# Telegram sessions should be named after the private key
+# Place in config/data/telegram_sessions/
+# Example: 0x123abc...def.session
 ```
 
 #### proxies.txt (optional)
@@ -144,7 +158,13 @@ The following settings are available in `config/settings.py`:
 2. The token should start with "MTI" or contain an alphanumeric token
 3. Add it to `config/data/auth_tokens_discord.txt`
 
-### 5. settings.yaml Configuration
+### 5. Telegram Session Setup
+
+1. Telegram session files must be named exactly as the private key
+2. Place session files in `config/data/telegram_sessions/`
+3. Filename format: `[private_key].session`
+
+### 6. settings.yaml Configuration
 
 ```yaml
 # Number of threads
@@ -179,25 +199,70 @@ After launching the bot, the following options are available:
 4. 👤 Profile - Set up profile and connect social accounts
 5. 💰 Faucet - Claim test tokens from Somnia faucet
 6. 💸 Transfer STT - Transfer STT tokens between wallets
-7. 👥 Social Quests 1 - Complete social media tasks and earn rewards
-8. 🚪 Exit - Exit the application
+7. 👥 Social Quests 1 - Complete initial social media tasks and earn rewards
+8. 🌐 Social Quests 2 - Complete advanced social media tasks and earn rewards
+9. 🚪 Exit - Exit the application
 
-## 🔍 Troubleshooting
+## 🌟 Social Quests
 
-1. "Somnia authorization error" - check the correctness of your private key
-2. "Discord/Twitter connection error" - check token validity
-3. "Wait 24 hours between requests" - observe the interval between faucet requests
-4. "Insufficient balance" - top up your token balance for transfers
+### Social Quests 1
+- Basic social media connection tasks
+- Referral registration
+- Initial platform interactions
 
-## ⚠️ Important Notes
+### Social Quests 2
+- Confirming Telegram tethering and setting user name
+- Following specific accounts
+- Retweet a tweet
 
-1. All private keys/mnemonics should be in the format: one line = one key
-2. Proxies must be working and in the correct format
-3. A valid auth_token is required for Twitter
-4. A valid token is required for Discord
-5. It's recommended to configure delays to avoid blocks
-6. Use advanced settings in settings.py with caution
+## 🔒 Security Recommendations
+
+1. **Protect Private Keys**: 
+   - Never share your private keys or mnemonic phrases
+   - Store sensitive data in secure, encrypted locations
+   - Use environment variables or secure configuration management
+
+2. **Proxy Usage**:
+   - Use reliable and secure proxy servers
+   - Rotate proxies to avoid IP blocking
+   - Validate proxy credentials and connectivity
+
+3. **Account Tokens**:
+   - Regularly update and rotate social media tokens
+   - Use dedicated accounts for bot operations
+   - Implement token encryption if possible
+
+4. **Rate Limiting**:
+   - Respect platform rate limits
+   - Configure appropriate delays between actions
+   - Avoid suspicious patterns that might trigger account suspensions
+
+## 🤝 Contributing
+
+### How to Contribute
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+### Development Guidelines
+
+- Follow PEP 8 Python style guide
+- Write clear, documented code
+- Include type hints
+- Add unit tests for new functionality
+- Update documentation accordingly
+
+## 📜 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
 
 ## ⚠️ Disclaimer
 
 Use the bot at your own risk. The author is not responsible for the consequences of using the bot, including account blocking or loss of funds.
+
+## 📞 Support
+
+For questions, issues, or support, please contact us through our Telegram channels.
