@@ -1,7 +1,5 @@
 import asyncio
-import hashlib
-import jwt
-import time
+import re
 
 import aiohttp
 from pyrogram import Client, filters
@@ -46,6 +44,7 @@ class TelegramClient(Wallet):
             enable_random_delays=True
         )
         self.form_session = None
+        self.cookies = {}
 
     async def get_client(self):
         """Initialize Telegram client and return user data."""
@@ -133,11 +132,11 @@ class TelegramClient(Wallet):
             if not await self._confirm_login():
                 return False
             
-            encoded_user_data = self._generate_user_data(me)
+            tg_auth_result = await self._generate_user_data(me)
             
             await self._cleanup()
             
-            return encoded_user_data
+            return tg_auth_result
             
         except Exception as e:
             log.error(f"Account {self.wallet_address} | Unexpected error in Telegram auth: {e}")
@@ -170,7 +169,16 @@ class TelegramClient(Wallet):
             headers=headers, 
             data=data, 
             proxy=proxy_url
-        ) as response:
+        ) as response:     
+            cookies = {k: v.value for k, v in response.cookies.items()}
+            stel_tsession_key = next((k for k in cookies.keys() if k.startswith('stel_tsession_')), None)
+
+            if stel_tsession_key:
+                self.cookies.update({
+                    'stel_ssid': cookies.get('stel_ssid'),
+                    stel_tsession_key: cookies.get(stel_tsession_key)
+                })
+            
             response_text = await response.text()
             
             if response.status != 200 or response_text != 'true':
@@ -217,6 +225,11 @@ class TelegramClient(Wallet):
             ) as response:
                 response_text = await response.text()
                 
+                cookies = {k: v.value for k, v in response.cookies.items()}
+                self.cookies.update({
+                    'stel_token': cookies.get('stel_token')
+                })
+                
                 if response.status == 200 and response_text == 'true':
                     log.success(f"Account {self.wallet_address} | Login successful")
                     return True
@@ -227,27 +240,38 @@ class TelegramClient(Wallet):
                 
                 await asyncio.sleep(5)
 
-    def _generate_user_data(self, me):
-        current_time = int(time.time())
-        
-        payload = {
-            "sub": int(me.id),
-            "first_name": str(me.first_name or ""),
-            "username": str(me.username or ""),
-            "iat": current_time,
-            "exp": current_time + 86400,
-            "auth_date": current_time
+    async def _generate_user_data(self, me):
+        headers = {
+            'authority': self.OAUTH_BASE_URL,
+            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'dnt': '1',
+            'referer': 'https://quest.somnia.network/',
+            'upgrade-insecure-requests': '1',
+            'user-agent': self.get_user_agent()
         }
         
-        SECRET_KEY = hashlib.sha256(str(self.wallet_address).encode()).hexdigest()
+        params = {
+            'bot_id': self.BOT_ID,
+            'origin': self.ORIGIN,
+            'redirect_uri': self.ORIGIN,
+            'scope': 'users',
+        }
         
-        token = jwt.encode(
-            payload, 
-            SECRET_KEY, 
-            algorithm='HS256'
-        )
+        proxy_url = str(self.proxy) if self.proxy else None
         
-        return token
+        async with self.form_session.get(
+            f'{self.OAUTH_BASE_URL}/auth', 
+            headers=headers, 
+            params=params,
+            cookies=self.cookies, 
+            proxy=proxy_url
+        ) as response:
+            response_text = await response.text()
+            match = re.search(r'tgAuthResult=([^"]+)', response_text)
+            if match:
+                tg_auth_result = match.group(1)    
+                
+                return tg_auth_result
 
     async def _cleanup(self):
         """Close all open sessions and connections."""
@@ -259,3 +283,4 @@ class TelegramClient(Wallet):
             
         if self.api_client:
             await self.api_client.close()
+            

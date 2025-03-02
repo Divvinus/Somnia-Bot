@@ -248,12 +248,13 @@ class ProfileModule(SomniaClient):
             # Handle referral
             log.info(f"Account {self.wallet_address} | Binding the referral code...")
             await self.referral_bind()            
-            # await random_sleep(self.wallet_address, **sleep_after_referral_bind)
+            await random_sleep(self.wallet_address, **sleep_after_referral_bind)
             
             # Get current user info
             log.info(f"Account {self.wallet_address} | Getting the current user info...")
             null_fields = await self.get_me_info()
             if null_fields is None:
+                log.success(f"Account {self.wallet_address} | Profile setup completed successfully")
                 return False
                          
             if "username" in null_fields:
