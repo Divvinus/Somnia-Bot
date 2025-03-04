@@ -1,6 +1,6 @@
 import asyncio
-import random
 import json
+import random
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -15,6 +15,7 @@ from curl_cffi.requests import AsyncSession, Response
 from core.exceptions.base import APIError, ServerError, SessionRateLimited
 from logger import log
 
+
 class RequestType(Enum):
     """Enum representing supported HTTP request types."""
     POST = "POST"
@@ -25,13 +26,7 @@ class RequestType(Enum):
 
 @dataclass
 class ChromeVersion:
-    """Chrome version details with randomization weights.
-
-    Attributes:
-        version (str): Chrome version identifier for impersonation.
-        weight (int): Weight for random selection probability.
-        ua_version (str): Version string used in User-Agent header.
-    """
+    """Chrome version details with randomization weights."""
     version: str
     weight: int
     ua_version: str
@@ -39,19 +34,8 @@ class ChromeVersion:
 
 @dataclass
 class APIConfig:
-    """Configuration settings for the API client.
-
-    Attributes:
-        DEFAULT_TIMEOUT (Tuple[float, float]): Min and max timeout range in seconds (default: 25.0, 35.0).
-        DEFAULT_RETRY_DELAY (float): Base delay between retries in seconds (default: 3.0).
-        DEFAULT_MAX_RETRIES (int): Maximum retry attempts (default: 3).
-        COOKIE_CLEANUP_PROBABILITY (float): Chance to clean expired cookies (default: 0.1).
-        COOKIE_MAX_AGE (int): Maximum cookie age in seconds (default: 3600).
-        DELAY_MEAN (float): Mean delay for random delays in seconds (default: 1.5).
-        DELAY_STD (float): Standard deviation for random delays (default: 0.5).
-        SESSION_LIFETIME_VARIANCE (Tuple[float, float]): Variance range for session lifetime (default: 0.8, 1.2).
-    """
-    DEFAULT_TIMEOUT: Tuple[float, float] = (25.0, 35.0)
+    """Configuration settings for the API client."""
+    DEFAULT_TIMEOUT: Tuple[float, float] = (10.0, 15.0)
     DEFAULT_RETRY_DELAY: float = 3.0
     DEFAULT_MAX_RETRIES: int = 3
     COOKIE_CLEANUP_PROBABILITY: float = 0.1
@@ -63,28 +47,19 @@ class APIConfig:
 
 class ProxyLocale:
     """Utility for managing proxy locales with multilingual support."""
-    
     DEFAULT_LOCALE = "en-US,en;q=0.9"
     FALLBACK_LANGUAGE = "en;q=0.8"
-
-    MULTILINGUAL_COUNTRIES: Dict[str, List[Tuple[str, float]]] = {
-        'CA': [('en', 0.9), ('fr', 0.8)],
-        'CH': [('de', 0.9), ('fr', 0.8), ('it', 0.7), ('rm', 0.6)],
-        'BE': [('nl', 0.9), ('fr', 0.8), ('de', 0.7)],
-        'LU': [('lb', 0.9), ('fr', 0.8), ('de', 0.7)],
+    MULTILINGUAL_COUNTRIES = {
+        "CA": [("en", 0.9), ("fr", 0.8)],
+        "CH": [("de", 0.9), ("fr", 0.8), ("it", 0.7), ("rm", 0.6)],
+        "BE": [("nl", 0.9), ("fr", 0.8), ("de", 0.7)],
+        "LU": [("lb", 0.9), ("fr", 0.8), ("de", 0.7)],
     }
 
     @classmethod
     @lru_cache(maxsize=128)
     def _generate_locale(cls, country: str) -> str:
-        """Generate a locale string based on a country code.
-
-        Args:
-            country (str): Two-letter ISO 3166-1 alpha-2 country code.
-
-        Returns:
-            str: A locale string (e.g., "en-US,en;q=0.8") or default if invalid.
-        """
+        """Generate a locale string based on a country code."""
         if not isinstance(country, str) or len(country) != 2 or not country.isalpha():
             return cls.DEFAULT_LOCALE
 
@@ -98,36 +73,28 @@ class ProxyLocale:
 
         country_lower = country_upper.lower()
         return f"{country_lower}-{country_upper},{cls.FALLBACK_LANGUAGE}"
-    
+
     @classmethod
     async def get_country_from_ip(cls, ip: str) -> str:
-        """Get the country from an IP address."""
+        """Get the country code from an IP address."""
         async with aiohttp.ClientSession() as session:
             async with session.get(f"https://ipinfo.io/{ip}/json") as response:
-                data: Dict = await response.json()
+                data = await response.json()
                 return data.get("country", "US")
-            
+
     @classmethod
     async def get_locale_for_proxy(cls, proxy: Optional[Proxy]) -> str:
-        """Retrieve the locale for a given proxy based on its IP address.
-
-        Args:
-            proxy (Optional[Proxy]): Proxy object with IP address.
-
-        Returns:
-            str: Locale string tailored to the proxy's country or default locale.
-        """
+        """Retrieve locale for a proxy based on its IP address."""
         if not proxy:
             return cls.DEFAULT_LOCALE
-        
         proxy_ip = proxy.host
         country_code = await cls.get_country_from_ip(proxy_ip)
         return cls._generate_locale(country_code)
 
+
 class BrowserProfile:
     """Browser profile management for HTTP requests."""
-    
-    CHROME_VERSIONS: List[ChromeVersion] = [
+    CHROME_VERSIONS = [
         ChromeVersion("chrome119", 5, "119.0.0.0"),
         ChromeVersion("chrome120", 10, "120.0.0.0"),
         ChromeVersion("chrome123", 15, "123.0.0.0"),
@@ -137,24 +104,13 @@ class BrowserProfile:
     @classmethod
     @lru_cache(maxsize=1)
     def get_random_chrome_version(cls) -> ChromeVersion:
-        """Select a random Chrome version based on weighted probabilities.
-
-        Returns:
-            ChromeVersion: A randomly chosen Chrome version object.
-        """
-        return random.choices(cls.CHROME_VERSIONS, weights=[v.weight for v in cls.CHROME_VERSIONS], k=1)[0]
+        """Select a random Chrome version based on weighted probabilities."""
+        return random.choices(cls.CHROME_VERSIONS, weights=[v.weight for v in cls.CHROME_VERSIONS])[0]
 
 
 class BaseAPIClient:
-    """Base class for interacting with APIs using asynchronous HTTP requests.
+    """Base class for interacting with APIs using asynchronous HTTP requests."""
 
-    Args:
-        base_url (str): Base URL for API requests.
-        proxy (Optional[Proxy]): Proxy configuration for requests (default: None).
-        session_lifetime (int): Number of requests before session rotation (default: 5).
-        enable_random_delays (bool): Whether to add random delays between requests (default: True).
-    """
-    
     def __init__(
         self,
         base_url: str,
@@ -162,6 +118,7 @@ class BaseAPIClient:
         session_lifetime: int = 5,
         enable_random_delays: bool = True
     ):
+        """Initialize the API client."""
         self.base_url = base_url.rstrip('/')
         self.proxy = proxy
         self.session_lifetime = session_lifetime
@@ -170,17 +127,18 @@ class BaseAPIClient:
         self.requests_count = 0
         self.last_url: Optional[str] = None
         self.session_start_time: Optional[float] = None
-        self.session = None
+        self.session: Optional[AsyncSession] = None
         self._session_lock = asyncio.Lock()
         self._closed = False
-        
-    async def initialize(self):
-        """Initialize the session."""
+
+    async def initialize(self) -> None:
+        """Initialize a new HTTP session."""
         if self._closed:
             self._closed = False
         self.session = await self._create_session()
 
-    async def close(self):
+    async def close(self) -> None:
+        """Close the current HTTP session."""
         async with self._session_lock:
             if self.session and not self._closed:
                 try:
@@ -194,16 +152,17 @@ class BaseAPIClient:
                     self.requests_count = 0
                     self.session_start_time = None
 
-    async def __aenter__(self):
-        """Async context manager enter."""
+    async def __aenter__(self) -> 'BaseAPIClient':
+        """Async context manager entry point."""
         await self.initialize()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit."""
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit point."""
         await self.close()
 
-    async def _ensure_session(self):
+    async def _ensure_session(self) -> None:
+        """Ensure a valid session exists."""
         if self.session is None or self._closed:
             log.debug("Session is None or closed, initializing new session")
             await self.initialize()
@@ -211,63 +170,35 @@ class BaseAPIClient:
             log.debug("Session is valid, reusing")
 
     async def _handle_curl_error(self, error: Exception) -> bool:
-        """Обработка ошибок, связанных с cURL и сетевыми сбоями.
-        
-        Returns:
-            bool: True, если ошибка была обработана и запрос следует повторить
-        """
+        """Handle curl-related or network errors."""
         error_str = str(error).lower()
-        
         session_reset_errors = [
-            "curlm already closed", 
-            "curl error", 
-            "connection",
-            "timeout", 
-            "reset by peer",
-            "eof",
-            "broken pipe",
-            "shutdown",
-            "certificate",
-            "handshake"
+            "curlm already closed", "curl error", "connection", "timeout",
+            "reset by peer", "eof", "broken pipe", "shutdown", "certificate", "handshake"
         ]
-        
         if any(err in error_str for err in session_reset_errors):
             log.warning(f"Detected connection error: {error_str}. Restarting session.")
             await self.close()
             await asyncio.sleep(1.5)
             await self.initialize()
             return True
-            
         return False
 
     async def _get_session_headers(self, chrome_version: ChromeVersion) -> Dict[str, str]:
-        """Generate session headers based on Chrome version and proxy locale.
-
-        Args:
-            chrome_version (ChromeVersion): Chrome version details.
-
-        Returns:
-            Dict[str, str]: HTTP headers for the session.
-        """
+        """Generate HTTP headers for the session."""
         locale = await ProxyLocale.get_locale_for_proxy(self.proxy)
         version = chrome_version.ua_version
         chrome_major = version.split(".", 1)[0]
-        ua = f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{version} Safari/537.36"
-
         return {
             "accept-language": locale,
-            "user-agent": ua,
+            "user-agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{version} Safari/537.36",
             "sec-ch-ua": f'"Chromium";v="{chrome_major}", "Google Chrome";v="{chrome_major}", "Not=A?Brand";v="99"',
             "sec-ch-ua-platform": '"Windows"',
             "sec-ch-ua-mobile": "?0"
         }
 
     async def _create_session(self) -> AsyncSession:
-        """Create a new HTTP session with configured headers and proxy.
-
-        Returns:
-            AsyncSession: A new asynchronous session object.
-        """
+        """Create a new HTTP session with configured headers and proxy."""
         chrome_version = BrowserProfile.get_random_chrome_version()
         session = AsyncSession(
             impersonate=chrome_version.version,
@@ -282,45 +213,61 @@ class BaseAPIClient:
         return session
 
     async def _manage_cookies(self, response: Response) -> None:
-        """Manage session cookies, cleaning up expired ones probabilistically.
-
-        Args:
-            response (Response): HTTP response containing cookies.
-        """
+        """Manage session cookies, cleaning up expired ones probabilistically."""
         if not response.cookies or random.random() >= self.config.COOKIE_CLEANUP_PROBABILITY:
             return
-
         current_time = time.time()
-        for key in [k for k, v in self.session.cookies.items() if current_time - self.session_start_time > self.config.COOKIE_MAX_AGE]:
+        expired_keys = [
+            key for key, _ in self.session.cookies.items()
+            if current_time - self.session_start_time > self.config.COOKIE_MAX_AGE
+        ]
+        for key in expired_keys:
             del self.session.cookies[key]
         self.session.cookies.update(response.cookies)
 
     async def _add_random_delay(self) -> None:
+        """Add a random delay if enabled."""
         if self.enable_random_delays:
             delay = abs(random.gauss(self.config.DELAY_MEAN, self.config.DELAY_STD))
             log.debug(f"Adding random delay of {delay:.2f}s")
             await asyncio.sleep(min(delay, 1.0))
 
     async def _maybe_rotate_session(self) -> None:
-        """Rotate the session if the request count exceeds a randomized lifetime."""
+        """Rotate the session if request count exceeds a randomized threshold."""
+        log.debug(f"Current request count: {self.requests_count}")
         self.requests_count += 1
-        if self.requests_count >= self.session_lifetime * random.uniform(*self.config.SESSION_LIFETIME_VARIANCE):
-            await self.close()
-            await self.initialize()
-            self.requests_count = 0
+        threshold = self.session_lifetime * random.uniform(*self.config.SESSION_LIFETIME_VARIANCE)
+        log.debug(f"Checking if rotation needed: {self.requests_count} >= {threshold:.2f}")
+        
+        if self.requests_count >= threshold:
+            log.debug("Rotating session: closing current session")
+            try:
+                await asyncio.wait_for(self.close(), timeout=5.0)
+            except asyncio.TimeoutError:
+                log.error("Session close timed out after 5s, forcing cleanup")
+                self.session = None
+                self._closed = True
+            except Exception as e:
+                log.error(f"Error closing session during rotation: {e}")
+                self.session = None
+                self._closed = True
+            
+            log.debug("Rotating session: initializing new session")
+            try:
+                await asyncio.wait_for(self.initialize(), timeout=10.0)
+                self.requests_count = 0
+                log.debug("Session rotated successfully")
+            except asyncio.TimeoutError:
+                log.error("Session initialization timed out after 10s")
+                raise ServerError("Failed to initialize new session during rotation due to timeout")
+            except Exception as e:
+                log.error(f"Error initializing new session during rotation: {e}")
+                raise ServerError(f"Failed to initialize new session: {str(e)}")
+        else:
+            log.debug("No session rotation needed")
 
     async def _make_request(self, request_type: RequestType, url: str, headers: Dict[str, str], **kwargs) -> Response:
-        """Execute an HTTP request of the specified type.
-
-        Args:
-            request_type (RequestType): Type of HTTP request (e.g., POST, GET).
-            url (str): Target URL for the request.
-            headers (Dict[str, str]): Request headers.
-            **kwargs: Additional arguments for the request method.
-
-        Returns:
-            Response: HTTP response object.
-        """
+        """Execute an HTTP request of the specified type."""
         log.debug(f"Making {request_type.value} request to {url}")
         timeout = random.uniform(*self.config.DEFAULT_TIMEOUT)
         request_method = {
@@ -330,21 +277,19 @@ class BaseAPIClient:
             RequestType.OPTIONS: self.session.options
         }[request_type]
         try:
-            response = await asyncio.wait_for(
-                request_method(url, headers=headers, **kwargs),
-                timeout=timeout
-            )
+            response = await asyncio.wait_for(request_method(url, headers=headers, **kwargs), timeout=timeout)
             log.debug(f"Request to {url} succeeded with status {response.status_code}")
             return response
         except asyncio.TimeoutError:
             log.error(f"Request to {url} timed out after {timeout:.2f} seconds")
             raise
-        
+
     async def send_request(
         self,
         request_type: Literal["POST", "GET", "OPTIONS", "PATCH"] = "POST",
         method: Optional[str] = None,
         json_data: Optional[Dict] = None,
+        data: Optional[str] = None,
         params: Optional[Dict] = None,
         url: Optional[str] = None,
         headers: Optional[Dict] = None,
@@ -355,27 +300,26 @@ class BaseAPIClient:
         allow_redirects: bool = False,
         custom_timeout: Optional[float] = None
     ) -> Response:
-        """
-        Send a request with extended error handling and adaptive timeouts.
-        
-        Args:
-            custom_timeout: User-defined timeout for heavy requests
-        """
+        """Send an HTTP request with retry logic and error handling."""
+        log.debug("Entering send_request")
         async with self._session_lock:
+            log.debug("Acquired session lock")
             await self._ensure_session()
-            
+            log.debug("Session ensured")
+
             request_url = url or f"{self.base_url}/{method.lstrip('/')}" if method else self.base_url
             request_type = RequestType(request_type)
-            await self._maybe_rotate_session()
-            await self._add_random_delay()
-
-            is_stats_request = method and "stats" in method
-            is_heavy_request = method and any(keyword in method for keyword in ["auth", "users", "socials"])
             
+            log.debug("Rotating session if needed")
+            await self._maybe_rotate_session()
+            log.debug("Adding random delay")
+            await self._add_random_delay()
+            log.debug("Delay completed")
+
             base_timeout = custom_timeout or (
-                self.config.DEFAULT_TIMEOUT[1] + 15 if is_stats_request else
-                self.config.DEFAULT_TIMEOUT[1] + 10 if is_heavy_request else
                 self.config.DEFAULT_TIMEOUT[1] + 5
+                if (method and any(kw in method for kw in ["auth", "users", "socials", "stats"]))
+                else self.config.DEFAULT_TIMEOUT[1]
             )
 
             request_headers = dict(self.session.headers)
@@ -387,129 +331,71 @@ class BaseAPIClient:
             kwargs = {"params": params, "cookies": cookies, "allow_redirects": allow_redirects}
             if json_data and request_type != RequestType.GET:
                 kwargs["json"] = json_data
+            if data and request_type != RequestType.GET:
+                kwargs["data"] = data
 
-            last_error = None
             for attempt in range(max_retries):
-                adaptive_timeout = base_timeout * (1 + attempt * 0.2)
-                
+                adaptive_timeout = min(base_timeout * (1 + attempt * 0.2), 15.0)
                 log.debug(f"Request to {request_url} (attempt {attempt+1}/{max_retries}) with timeout {adaptive_timeout:.2f}s")
                 
                 try:
+                    log.debug(f"Starting request execution for {request_url}")
                     response = await asyncio.wait_for(
                         self._make_request(request_type, request_url, request_headers, **kwargs),
                         timeout=adaptive_timeout
                     )
+                    log.debug(f"Request completed successfully for {request_url} with status {response.status_code}")
+                    
                     
                     if response.status_code == 429:
-                        retry_after = response.headers.get('Retry-After', retry_delay * 2)
-                        retry_after = float(retry_after) if isinstance(retry_after, str) and retry_after.isdigit() else retry_delay * 2
-                        log.warning(f"Rate limited (attempt {attempt+1}/{max_retries}): {request_url}, waiting {retry_after:.2f}s")
+                        retry_after = float(response.headers.get('Retry-After', retry_delay * 2))
+                        log.warning(f"Rate limited (429) on attempt {attempt+1}/{max_retries}: {request_url}, waiting {retry_after:.2f}s")
                         await asyncio.sleep(retry_after)
                         continue
                     
                     await self._manage_cookies(response)
                     self.last_url = request_url
                     
-                    if verify:
-                        try:
-                            self._verify_response_status(response)
-                        except (SessionRateLimited, ServerError) as e:
-                            last_error = e
-                            log.warning(f"Response status error (attempt {attempt+1}/{max_retries}): {str(e)}")
-                            
-                            if isinstance(e, SessionRateLimited):
-                                await self.close()
-                                await asyncio.sleep(retry_delay * 2)
-                                await self.initialize()
-                            elif isinstance(e, ServerError) and attempt < max_retries - 1:
-                                backoff = retry_delay * (2 ** attempt) * (0.8 + random.random() * 0.4)
-                                log.info(f"Server error, waiting {backoff:.2f}s before retry...")
-                                await asyncio.sleep(backoff)
-                            continue
+                    if 'application/json' in response.headers.get('Content-Type', '',):
+                        response_data = response.json()
+                        await self._verify_response(response_data)
                     
-                    if 'application/json' in response.headers.get('Content-Type', ''):
-                        try:
-                            response_data = response.json()
-                            await self._verify_response(response_data)
-                        except json.JSONDecodeError:
-                            log.warning(f"Invalid JSON in response (attempt {attempt+1}/{max_retries})")
-                            if attempt == max_retries - 1:
-                                log.error(f"Failed to parse JSON response after {max_retries} attempts")
-                                raise
-                            continue
-                        except APIError as e:
-                            last_error = e
-                            log.warning(f"API error in response (attempt {attempt+1}/{max_retries}): {str(e)} | Link: {request_url}")
-                            if attempt == max_retries - 1:
-                                raise
-                            await asyncio.sleep(retry_delay)
-                            continue
-                            
+                    log.debug(f"Request to {request_url} succeeded on attempt {attempt+1}/{max_retries}")
                     return response
                     
                 except asyncio.TimeoutError as e:
-                    last_error = e
-                    log.warning(f"Request timed out (attempt {attempt+1}/{max_retries}): {request_url} - Timeout: {adaptive_timeout:.2f}s")
-                    
+                    log.error(f"Timeout on attempt {attempt+1}/{max_retries}: {request_url} - Timeout: {adaptive_timeout:.2f}s")
                     await self.close()
-                    await asyncio.sleep(1.5)    
+                    await asyncio.sleep(1.0)
                     await self.initialize()
-                    
-                except aiohttp.ClientError as e:
-                    last_error = e
-                    log.warning(f"HTTP client error (attempt {attempt+1}/{max_retries}): {str(e)}")
-                    await self._handle_curl_error(e)
-                    
-                except Exception as error:
-                    last_error = error
-                    log.warning(f"Request error (attempt {attempt+1}/{max_retries}): {str(error)}")
-                    
-                    if await self._handle_curl_error(error):
-                        continue
-                        
-                    if "certificate" in str(error).lower():
-                        log.warning("SSL certificate error detected, continuing anyway")
-                        continue
-                        
                     if attempt == max_retries - 1:
-                        raise
+                        raise ServerError(f"Request to {request_url} timed out after {max_retries} attempts") from e
+                except Exception as e:
+                    if await self._handle_curl_error(e):
+                        continue
+                    if attempt == max_retries - 1:
+                        error_msg = f"Failed after {max_retries} attempts"
+                        if e:
+                            error_msg += f". Last error: {str(e)}"
+                        log.error(error_msg)
+                        raise ServerError(error_msg) from e
 
                 backoff = retry_delay * (2 ** attempt) * (0.8 + random.random() * 0.4)
-                log.info(f"Waiting {backoff:.2f}s before retry...")
+                log.debug(f"Waiting {backoff:.2f}s before retry...")
                 await asyncio.sleep(backoff)
 
-            error_msg = f"Failed after {max_retries} attempts"
-            if last_error:
-                error_msg += f". Last error: {str(last_error)}"
-            raise ServerError(error_msg)
-    
     @staticmethod
     def _verify_response_status(response: Response) -> None:
-        """Verify the HTTP response status code.
-
-        Args:
-            response (Response): HTTP response to check.
-
-        Raises:
-            SessionRateLimited: If status is 403.
-            ServerError: If status is 500, 502, 503, or 504.
-        """
+        """Verify the HTTP response status code."""
         status = response.status_code
         if status == 403:
-            raise SessionRateLimited("Session is rate-limited")
+            raise SessionRateLimited(f"Session is rate-limited (HTTP 403). URL: {response.url}")
         if status in (500, 502, 503, 504):
             raise ServerError(f"Server error - {status}")
 
     @staticmethod
     async def _verify_response(response_data: Union[Dict, List]) -> None:
-        """Check the API response data for errors.
-
-        Args:
-            response_data (Union[Dict, List]): Parsed response data.
-
-        Raises:
-            APIError: If the response contains an error indicator.
-        """
+        """Check the API response data for errors."""
         if not isinstance(response_data, dict):
             return
             
@@ -527,5 +413,4 @@ class BaseAPIClient:
                 error_details = response_data.get("message", "")
                 if not error_details and isinstance(response_data.get("errors"), list):
                     error_details = ", ".join(str(e) for e in response_data["errors"])
-                
                 raise APIError(f"API error: {error_details or response_data}", response_data)
