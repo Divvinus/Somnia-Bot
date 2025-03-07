@@ -1,106 +1,73 @@
-import secrets
-from typing import Tuple, Union
-import random
+"""Module for checking Reddio verification tasks."""
 
-from eth_keys import keys
-from eth_utils import to_checksum_address
-
-from core.wallet import Wallet
-from logger import log
+from typing import Any, TypeAlias
+from core.api import BaseAPIClient
 from models import Account
-from utils.logger_trx import show_trx_log
-from loader import config
+from logger import log
 
 
-class TransferSTTModule(Wallet):
+JsonDict: TypeAlias = dict[str, Any]
+
+account: Account = Account()
+api: BaseAPIClient = BaseAPIClient(proxy=account.proxy)
+
+async def check_verify_task(
+    wallet_address: str,
+    faucet: bool | None = None,
+    transferred: bool | None = None,
+    bridged: bool | None = None
+) -> bool | None:
     """
-    Module for executing STT transactions on Somnia testnet network.
-    Provides address generation and transfer execution based on balance.
+    Check the status of verification tasks for a given wallet address.
+
+    Args:
+        wallet_address (str): The wallet address to check.
+        faucet (bool | None): Check faucet claim status.
+        transferred (bool | None): Check daily transfer status.
+        bridged (bool | None): Check daily bridge status.
+
+    Returns:
+        bool | None: The status of the requested task, or None if an error occurs.
     """
+    headers: JsonDict = {
+        'authority': 'points-mainnet.reddio.com',
+        'accept': 'application/json, text/plain, */*',
+        'cache-control': 'no-cache',
+        'dnt': '1',
+        'origin': 'https://points.reddio.com',
+        'pragma': 'no-cache',
+        'referer': 'https://points.reddio.com/',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-site',
+    }
     
-    MINIMUM_BALANCE = 0.001
-    GAS_LIMIT = 21000
-    
-    def __init__(self, account: Account, rpc_url: str):
-        """
-        Initialize transfer module.
+    params: JsonDict = {'wallet_address': wallet_address}
 
-        Args:
-            account: Account object containing private key/mnemonic and proxy
-            rpc_url: Somnia testnet network RPC endpoint URL
-        """
-        super().__init__(account.private_key, rpc_url, account.proxy)
-    
-    @staticmethod
-    def generate_eth_address() -> str:
-        """
-        Generate new EVM address from random private key.
-        
-        Returns:
-            str: Checksum formatted EVM address
-        """
-        private_key = keys.PrivateKey(secrets.token_bytes(32))
-        return to_checksum_address(private_key.public_key.to_address())
-    
-    def _calculate_transfer_amount(self, balance: float) -> Union[float, None]:
-        """
-        Determine transfer amount based on current balance.
-        Randomly selects amount from available options based on balance threshold.
-        
-        Args:
-            balance: Current wallet balance in STT
+    try:
+        response = await api.send_request(
+            request_type="GET",
+            url="https://points-mainnet.reddio.com/v1/userinfo",
+            headers=headers,
+            params=params,
+        )
 
-        Returns:
-            float or None: Transfer amount or None if balance insufficient
-        """
-        if balance > 0.01:
-            return random.choice([0.01, 0.005, 0.001])
-        elif balance > 0.005:
-            return random.choice([0.005, 0.001])
-        elif balance > 0.001:
-            return 0.001
+        response_data: JsonDict = response.json()
+
+        if response_data.get("status") != "OK":
+            return None
+        
+        user_data: JsonDict = response_data.get("data", {})
+
+        if faucet is not None:
+            return bool(user_data.get("devnet_faucet_claimed", False))
+        if transferred is not None:
+            return bool(user_data.get("devnet_daily_transferred", False))
+        if bridged is not None:
+            return bool(user_data.get("devnet_daily_bridged", False))
+
         return None
-    
-    async def transfer_stt(self) -> Tuple[bool, str]:
-        """
-        Execute STT transfer to randomly generated address.
-        
-        Transfer amount is determined based on current wallet balance.
-        Checks transaction availability and executes with set gas limit.
 
-        Returns:
-            Tuple[bool, str]: (operation status, tx_hash or error message)
-        """
-        log.info(f"Account {self.wallet_address} | Processing transfer_stt...")
-        
-        try:
-            balance = await self.human_balance()
-            amount = self._calculate_transfer_amount(balance)
-            to_address = self.generate_eth_address()
-            
-            if not amount:
-                error_msg = f"Account {self.wallet_address} | Not enough balance"
-                log.error(error_msg)
-                return False, error_msg
-            
-            transaction = {
-                "from": self.wallet_address,
-                "to": to_address,
-                "value": self.to_wei(amount, "ether"),
-                "nonce": await self.transactions_count(),
-                "gasPrice": await self.eth.gas_price,
-                "gas": self.GAS_LIMIT
-            }
-            
-            await self.check_trx_availability(transaction)
-            status, tx_hash = await self._process_transaction(transaction)
-            
-            show_trx_log(self.wallet_address, f"Transfer {amount} STT to {to_address}", status, tx_hash, 
-                        config.somnia_explorer)
-            
-            return (True, tx_hash) if status else (False, f"Transaction failed: {tx_hash}")
-            
-        except Exception as e:
-            error_msg = f"Error in transfer_stt: {str(e)}"
-            log.error(f"Account {self.wallet_address} | {error_msg}")
-            return False, error_msg
+    except Exception as error:
+        log.error(f"Error parsing response: {error}")
+        return None
