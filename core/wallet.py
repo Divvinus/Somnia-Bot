@@ -13,7 +13,7 @@ from web3.eth import AsyncEth
 from web3.types import Nonce, TxParams
 
 from core.exceptions.base import InsufficientFundsError, WalletError
-from models import Erc20Contract
+from models.onchain import *
 
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
@@ -23,21 +23,7 @@ Account.enable_unaudited_hdwallet_features()
 
 
 class Wallet(AsyncWeb3, Account):
-    """
-    Blockchain wallet with AsyncWeb3 functionality and ERC-20 interactions.
-    
-    Handles blockchain transactions, signatures, token interactions,
-    and balance operations.
-    """
     def __init__(self, private_key: str, rpc_url: Union[HttpUrl, str], proxy: Optional[Proxy] = None):
-        """
-        Initialize wallet with private key and connection settings.
-        
-        Args:
-            private_key: Wallet private key or mnemonic phrase
-            rpc_url: Blockchain RPC endpoint URL
-            proxy: Optional proxy for network requests
-        """
         provider = AsyncHTTPProvider(
             str(rpc_url),
             request_kwargs={
@@ -49,6 +35,20 @@ class Wallet(AsyncWeb3, Account):
         
         self.keypair = self._initialize_keypair(private_key)
         self._contracts_cache: Dict[str, AsyncContract] = {}
+        
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if hasattr(self.provider, '_session') and self.provider._session:
+            await self.provider._session.close()
+
+    def __del__(self):
+        if hasattr(self.provider, '_session') and self.provider._session:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(self.provider._session.close())
         
     @staticmethod
     def _initialize_keypair(private_key: str) -> Account:
@@ -89,28 +89,26 @@ class Wallet(AsyncWeb3, Account):
         """
         return AsyncWeb3.to_checksum_address(address)
 
-    def get_contract(self, contract: Union[Erc20Contract, str, object]) -> AsyncContract:
-        """
-        Get contract instance with caching.
-        
-        Args:
-            contract: Contract address, Erc20Contract, or contract-like object
-            
-        Returns:
-            AsyncContract instance
-            
-        Raises:
-            TypeError: If contract type is invalid
-        """
+    async def get_contract(self, contract: Union[BaseContract, str, object]) -> AsyncContract:
         if isinstance(contract, str):
             address = self._get_checksum_address(contract)
             if address not in self._contracts_cache:
                 self._contracts_cache[address] = self.eth.contract(
                     address=address,
-                    abi=Erc20Contract().abi
+                    abi=ERC20Contract().abi
                 )
             return self._contracts_cache[address]
-            
+        
+        if isinstance(contract, BaseContract):
+            address = self._get_checksum_address(contract.address)
+            if address not in self._contracts_cache:
+                abi = await contract.get_abi()
+                self._contracts_cache[address] = self.eth.contract(
+                    address=address,
+                    abi=abi
+                )
+            return self._contracts_cache[address]
+
         if hasattr(contract, "address") and hasattr(contract, "abi"):
             address = self._get_checksum_address(contract.address)
             if address not in self._contracts_cache:
@@ -119,10 +117,8 @@ class Wallet(AsyncWeb3, Account):
                     abi=contract.abi
                 )
             return self._contracts_cache[address]
-            
-        raise TypeError(
-            "Invalid contract type: expected Erc20Contract, str, or contract-like object"
-        )
+
+        raise TypeError("Invalid contract type: expected BaseContract, str, or contract-like object")
 
     async def token_balance(self, token_address: str) -> int:
         """
@@ -134,7 +130,7 @@ class Wallet(AsyncWeb3, Account):
         Returns:
             Token balance in smallest units
         """
-        contract = self.get_contract(token_address)
+        contract = await self.get_contract(token_address)
         return await contract.functions.balanceOf(
             self._get_checksum_address(self.keypair.address)
         ).call()
@@ -168,7 +164,7 @@ class Wallet(AsyncWeb3, Account):
         if self._is_native_token(token_address):
             return self.to_wei(Decimal(str(amount)), 'ether')
 
-        contract = self.get_contract(token_address)
+        contract = await self.get_contract(token_address)
         decimals = await contract.functions.decimals().call()
         return int(Decimal(str(amount)) * Decimal(str(10 ** decimals)))
     
@@ -188,7 +184,7 @@ class Wallet(AsyncWeb3, Account):
         if self._is_native_token(token_address):
             return float(self.from_wei(amount, 'ether'))
 
-        contract = self.get_contract(token_address)
+        contract = await self.get_contract(token_address)
         decimals = await contract.functions.decimals().call()
         return float(Decimal(str(amount)) / Decimal(str(10 ** decimals)))
 
@@ -312,7 +308,7 @@ class Wallet(AsyncWeb3, Account):
             Tuple of (success_status, result_message)
         """
         try:
-            token_contract = self.get_contract(token_address)
+            token_contract = await self.get_contract(token_address)
             
             current_allowance = await token_contract.functions.allowance(
                 self.wallet_address, 

@@ -9,7 +9,7 @@ threads: 1
 # Network Settings
 #------------------------------------------------------------------------------
 # Somnia Testnet RPC endpoint
-somnia_rpc: https://dream-rpc.somnia.network  
+somnia_rpc: https://dream-rpc.somnia.network
 
 # Somnia Testnet Explorer
 somnia_explorer: https://somnia-testnet.socialscan.io/

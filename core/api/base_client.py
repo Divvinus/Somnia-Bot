@@ -1,267 +1,334 @@
 import asyncio
 import random
-import time
-from dataclasses import dataclass
-from enum import Enum
-from typing import Dict, List, Literal, Optional, Union
+import json
+import ssl as ssl_module
+from types import TracebackType
+from typing import Literal, Any, Self, Type
 
+import aiohttp
+import ua_generator
+from yarl import URL
 from better_proxy import Proxy
-from curl_cffi.requests import AsyncSession, Response
 
 from core.exceptions.base import APIError, ServerError, SessionRateLimited
 from logger import log
 
 
-class RequestType(Enum):
-    """Enum representing supported HTTP request types."""
-    POST = "POST"
-    GET = "GET"
-    OPTIONS = "OPTIONS"
-    PATCH = "PATCH"
-
-
-@dataclass
-class ChromeVersion:
-    """Chrome version details with randomization weights."""
-    version: str
-    weight: int
-    ua_version: str
-
-
-@dataclass
-class APIConfig:
-    """Configuration settings for the API client."""
-    DEFAULT_TIMEOUT: float = 30.0
-    DEFAULT_RETRY_DELAY: float = 1.0
-    DEFAULT_MAX_RETRIES: int = 3
-    COOKIE_CLEANUP_PROBABILITY: float = 0.1
-    COOKIE_MAX_AGE: int = 3600
-
-
-class BrowserProfile:
-    """Browser profile management for HTTP requests."""
-    CHROME_VERSIONS = [
-        ChromeVersion("chrome124", 20, "124.0.0.0"),
-    ]
-
-    @classmethod
-    def get_random_chrome_version(cls) -> ChromeVersion:
-        """Select the latest Chrome version for consistency."""
-        return cls.CHROME_VERSIONS[0]
-
+class HttpStatusError(APIError):
+    def __init__(self, message: str, status_code: int, response_data: Any = None) -> None:
+        super().__init__(message, response_data)
+        self.status_code: int = status_code
+        
 
 class BaseAPIClient:
-    """Optimized and reliable API client for asynchronous HTTP requests."""
-
+    RETRYABLE_ERRORS = (
+        ServerError, 
+        SessionRateLimited,
+        aiohttp.ClientError, 
+        asyncio.TimeoutError,
+        HttpStatusError
+    )
+    
     def __init__(
-        self,
-        base_url: str,
-        proxy: Optional[Proxy] = None,
-        session_lifetime: int = 10
-    ):
-        """Initialize the API client."""
-        self.base_url = base_url.rstrip('/')
-        self.proxy = proxy
-        self.session_lifetime = session_lifetime
-        self.config = APIConfig()
-        self.requests_count = 0
-        self.last_url: Optional[str] = None
-        self.session_start_time: Optional[float] = None
-        self.session: Optional[AsyncSession] = None
-        self._closed = False
-
-    async def initialize(self) -> None:
-        """Initialize a new HTTP session quickly."""
-        try:
-            self.session = await asyncio.wait_for(self._create_session(), timeout=5.0)
-            self.session_start_time = time.time()
-            self.requests_count = 0
-            self._closed = False
-            log.debug("Session initialized")
-        except Exception as e:
-            log.error(f"Failed to initialize session: {e}")
-            raise ServerError(f"Session initialization failed: {e}")
-
-    async def close(self) -> None:
-        """Close the current HTTP session efficiently."""
-        if self.session and not self._closed:
-            try:
-                await asyncio.wait_for(self.session.close(), timeout=3.0)
-            except Exception as e:
-                log.warning(f"Error closing session: {e}")
-            finally:
-                self.session = None
-                self._closed = True
-                self.requests_count = 0
-                self.session_start_time = None
-
-    async def _create_session(self) -> AsyncSession:
-        """Create a new HTTP session with minimal overhead."""
-        chrome_version = BrowserProfile.get_random_chrome_version()
-        session = AsyncSession(
-            impersonate=chrome_version.version,
-            verify=False,
-            timeout=self.config.DEFAULT_TIMEOUT
-        )
-        session.headers.update({
-            "accept-language": "en-US,en;q=0.9",
-            "user-agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version.ua_version} Safari/537.36",
-            "sec-ch-ua": f'"Chromium";v="{chrome_version.ua_version.split(".")[0]}", "Google Chrome";v="{chrome_version.ua_version.split(".")[0]}", "Not=A?Brand";v="99"',
-            "sec-ch-ua-platform": '"Windows"',
-            "sec-ch-ua-mobile": "?0"
-        })
-        if self.proxy:
-            proxy_url = self.proxy.as_url
-            session.proxies = {"http": proxy_url, "https": proxy_url}
-        return session
-
-    async def _rotate_session(self) -> None:
-        """Rotate session if needed with minimal delay."""
-        self.requests_count += 1
-        if self.requests_count >= self.session_lifetime:
-            await self.close()
-            await self.initialize()
-
-    async def _manage_cookies(self, response: Response) -> None:
-        """Manage session cookies, cleaning up expired ones probabilistically."""
-        if not response.cookies or random.random() >= self.config.COOKIE_CLEANUP_PROBABILITY:
-            return
-        current_time = time.time()
-        expired_keys = [
-            key for key, _ in self.session.cookies.items()
-            if current_time - self.session_start_time > self.config.COOKIE_MAX_AGE
-        ]
-        for key in expired_keys:
-            del self.session.cookies[key]
-        self.session.cookies.update(response.cookies)
-
-    async def send_request(
-        self,
-        request_type: Literal["POST", "GET", "OPTIONS", "PATCH"] = "POST",
-        method: Optional[str] = None,
-        json_data: Optional[Dict] = None,
-        data: Optional[str] = None,
-        params: Optional[Dict] = None,
-        url: Optional[str] = None,
-        headers: Optional[Dict] = None,
-        cookies: Optional[Dict] = None,
-        verify: bool = True,
-        max_retries: int = APIConfig.DEFAULT_MAX_RETRIES,
-        retry_delay: float = APIConfig.DEFAULT_RETRY_DELAY,
-        allow_redirects: bool = False,
-        custom_timeout: Optional[float] = None,
-        raw_request: bool = False,
-        ignore_errors: bool = False,
-        user_agent: Optional[str] = None
-    ) -> Response:
-        """Send an HTTP request with full parameter support and optimized retry logic."""
-        if not self.session or self._closed:
-            await self.initialize()
-
-        request_url = url or f"{self.base_url}/{method.lstrip('/')}" if method else self.base_url
-        request_type = RequestType(request_type)
-        request_headers = dict(self.session.headers)
-        if user_agent:
-            request_headers["user-agent"] = user_agent
-        if headers:
-            request_headers.update(headers)
-            if "referer" not in headers and self.last_url and not request_url.startswith(self.last_url):
-                request_headers["referer"] = self.last_url
-
-        kwargs = {"params": params, "cookies": cookies, "allow_redirects": allow_redirects}
-        if json_data and request_type != RequestType.GET:
-            kwargs["json"] = json_data
-        if data and request_type != RequestType.GET:
-            kwargs["data"] = data
-
-        request_method = {
-            RequestType.POST: self.session.post,
-            RequestType.GET: self.session.get,
-            RequestType.PATCH: self.session.patch,
-            RequestType.OPTIONS: self.session.options
-        }[request_type]
-
-        for attempt in range(max_retries):
-            timeout = custom_timeout or self.config.DEFAULT_TIMEOUT
-            try:
-                response = await asyncio.wait_for(
-                    request_method(request_url, headers=request_headers, **kwargs),
-                    timeout=timeout
-                )
-                if response.status_code == 429:
-                    retry_after = float(response.headers.get('Retry-After', retry_delay))
-                    log.warning(f"Rate limited (429), retrying after {retry_after}s")
-                    await asyncio.sleep(retry_after)
-                    continue
-                
-                if raw_request:
-                    return response
-                
-                await self._manage_cookies(response)
-                self.last_url = request_url
-                
-                if verify and not ignore_errors:
-                    self._verify_response_status(response)
-                    if 'application/json' in response.headers.get('Content-Type', ''):
-                        response_data = response.json()
-                        await self._verify_response(response_data)
-                
-                return response
-
-            except asyncio.TimeoutError as e:
-                log.error(f"Timeout on attempt {attempt + 1}/{max_retries} after {timeout}s")
-                await self.close()
-                await self._rotate_session()
-                if attempt == max_retries - 1:
-                    raise ServerError(f"Request timed out after {max_retries} attempts") from e
-                await asyncio.sleep(retry_delay)
-
-            except Exception as e:
-                log.error(f"Error on attempt {attempt + 1}/{max_retries}: {e}")
-                await self.close()
-                await self._rotate_session()
-                if attempt == max_retries - 1:
-                    raise ServerError(f"Request failed after {max_retries} attempts: {e}")
-                await asyncio.sleep(retry_delay)
-
-    @staticmethod
-    def _verify_response_status(response: Response) -> None:
-        """Verify the HTTP response status code."""
-        status = response.status_code
-        if status == 403:
-            raise SessionRateLimited(f"Session is rate-limited (HTTP 403). URL: {response.url}")
-        if status in (500, 502, 503, 504):
-            raise ServerError(f"Server error - {status}")
-        if status >= 400:
-            raise ServerError(f"HTTP error: {status}")
-
-    @staticmethod
-    async def _verify_response(response_data: Union[Dict, List]) -> None:
-        """Check the API response data for errors."""
-        if not isinstance(response_data, dict):
-            return
-            
-        error_checks = [
-            ("status", lambda x: x is False or str(x).lower() == "failed"),
-            ("success", lambda x: x is False),
-            ("error", lambda x: x is not None and x),
-            ("errors", lambda x: x and len(x) > 0),
-            ("statusCode", lambda x: isinstance(x, int) and x not in (200, 201, 202, 204)),
-            ("code", lambda x: isinstance(x, int) and x >= 400)
-        ]
+        self, 
+        base_url: str, 
+        proxy: Proxy | None = None
+    ) -> None:
+        self.base_url: str = base_url
+        self.proxy: Proxy | None = proxy
+        self.session: aiohttp.ClientSession | None = None
+        self._lock: asyncio.Lock = asyncio.Lock()
+        self._session_active: bool = False
+        self._headers: dict[str, str | bool | list[str]] = self._generate_headers()
+        self._ssl_context: ssl_module.SSLContext = ssl_module.create_default_context()
+        self._connector: aiohttp.TCPConnector = self._create_connector()
         
-        for key, check in error_checks:
-            if key in response_data and check(response_data[key]):
-                error_details = response_data.get("message", "")
-                if not error_details and isinstance(response_data.get("errors"), list):
-                    error_details = ", ".join(str(e) for e in response_data["errors"])
-                raise APIError(f"API error: {error_details or response_data}", response_data)
+    @staticmethod
+    def _generate_headers() -> dict[str, str | bool | list[str]]:
+        user_agent = ua_generator.generate(
+            device='desktop', 
+            platform='windows', 
+            browser='chrome'
+        )
+        
+        return {
+            'accept-language': 'en-US;q=0.9,en;q=0.8',
+            'sec-ch-ua': user_agent.ch.brands,
+            'sec-ch-ua-mobile': user_agent.ch.mobile,
+            'sec-ch-ua-platform': user_agent.ch.platform,
+            'user-agent': user_agent.text
+        }
+    
+    def _create_connector(self) -> aiohttp.TCPConnector:
+        return aiohttp.TCPConnector(
+            enable_cleanup_closed=True,
+            ssl=True
+        )
 
-    async def __aenter__(self) -> 'BaseAPIClient':
-        """Async context manager entry point."""
-        await self.initialize()
+    def _determine_ssl_settings(
+        self,
+        url: str,
+        ssl_param: bool | ssl_module.SSLContext
+    ) -> ssl_module.SSLContext | bool:
+        parsed_url: URL = URL(url)
+        is_https: bool = parsed_url.scheme.lower() == 'https'
+        
+        if not is_https:
+            return False
+        
+        if isinstance(ssl_param, ssl_module.SSLContext):
+            return ssl_param
+            
+        return self._ssl_context if ssl_param else False
+    
+    async def _get_session(self) -> aiohttp.ClientSession:
+        async with self._lock:
+            if self.session is None or self.session.closed:
+                self.session = aiohttp.ClientSession(
+                    connector=self._connector,
+                    timeout=aiohttp.ClientTimeout(total=120),
+                    headers=self._headers
+                )
+            return self.session
+
+    async def _reset_session_if_needed(self, skip_header_regeneration: bool = False) -> None:
+        async with self._lock:
+            if self.session is not None:
+                old_session: aiohttp.ClientSession = self.session
+                
+                if not skip_header_regeneration:
+                    self._headers = self._generate_headers()
+                
+                self.session = aiohttp.ClientSession(
+                    connector=self._connector, 
+                    timeout=aiohttp.ClientTimeout(total=120),
+                    headers=self._headers
+                )
+                
+                asyncio.create_task(self._safely_close_session(old_session))
+
+    @staticmethod
+    async def _safely_close_session(session: aiohttp.ClientSession) -> None:
+        if session and not session.closed:
+            try:
+                await session.close()
+                await asyncio.sleep(0.25)
+            except Exception as e:
+                log.warning(f"Error closing session: {type(e).__name__}: {e}")
+
+    async def __aenter__(self) -> Self:
+        await self._get_session()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Async context manager exit point."""
-        await self.close()
+    async def __aexit__(
+        self,
+        exc_type: Type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None
+    ) -> None:
+        if self.session and not self.session.closed:
+            await self._safely_close_session(self.session)
+            self.session = None
+            
+        if self._connector:
+            await self._connector.close()
+            
+    async def send_request(
+        self,
+        request_type: Literal["POST", "GET", "PUT", "OPTIONS"] = "POST",
+        method: str | None = None,
+        json_data: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+        url: str | None = None,
+        headers: dict[str, str] | None = None,
+        cookies: dict[str, str] | None = None,
+        verify: bool = True,
+        allow_redirects: bool = True,
+        ssl: bool | ssl_module.SSLContext = True,
+        max_retries: int = 3,
+        retry_delay: tuple[float, float] = (1.5, 5.0),
+        user_agent: str | None = None
+    ) -> dict[str, Any] | str:
+        
+        if not url and not method:
+            raise ValueError("Either url or method must be provided")
+        
+        if url:
+            target_url: str = url
+        else:
+            base: URL = URL(self.base_url)
+            method_path: str = method.lstrip('/') if method else ''
+            target_url: str = str(base / method_path)
+        
+        if ssl:
+            ssl_param: ssl_module.SSLContext | bool = self._determine_ssl_settings(target_url, ssl)
+        else:
+            ssl_param = ssl
+            
+        skip_header_regeneration: bool = user_agent is not None
+        
+        retryable_errors: tuple = self.RETRYABLE_ERRORS
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                if self.session and self.session.closed:
+                    await self._reset_session_if_needed(skip_header_regeneration)
+                
+                session: aiohttp.ClientSession = await self._get_session()
+                
+                merged_headers: dict[str, str | bool | list[str]] = dict(session.headers)
+                if headers:
+                    merged_headers.update(headers)
+                
+                if user_agent:
+                    merged_headers['user-agent'] = user_agent
+        
+                async with session.request(
+                    proxy=self.proxy.as_url if self.proxy else None,
+                    method=request_type,
+                    url=target_url,
+                    json=json_data,
+                    data=data,
+                    params=params,
+                    headers=merged_headers,
+                    cookies=cookies,
+                    ssl=ssl_param,
+                    allow_redirects=allow_redirects,
+                    raise_for_status=False
+                ) as response:
+                    response_data: dict[str, Any] | list[Any] | str = await self._parse_response(response)
+                    
+                    if verify:
+                        await self._verify_response(response, response_data)
+                        
+                    return response_data
+
+            except retryable_errors as error:
+                if isinstance(error, HttpStatusError) and getattr(error, 'status_code', 0) != 429:
+                    raise error
+                
+                if attempt < max_retries:
+                    delay: float = random.uniform(*retry_delay) * min(2 ** (attempt - 1), 30)
+                    
+                    if isinstance(error, (ServerError, SessionRateLimited)):
+                        log.debug(f"Server or rate limit error. Retry {attempt}/{max_retries} in {delay:.2f} seconds")
+                    elif isinstance(error, (aiohttp.ClientError, asyncio.TimeoutError)):
+                        log.debug(f"Network error {type(error).__name__}: {error}. Retry {attempt}/{max_retries} after {delay:.2f} seconds")
+                        await self._reset_session_if_needed(skip_header_regeneration)
+                    
+                    await asyncio.sleep(delay)
+                    continue
+                
+                if isinstance(error, (ServerError, SessionRateLimited)):
+                    raise error
+                else:
+                    raise ServerError(
+                        f"The request failed after {max_retries} attempts to {target_url}"
+                    ) from error
+
+            except Exception as error:
+                log.error(f"Unexpected error when querying to {target_url}: {type(error).__name__}: {error}")
+                if attempt < max_retries:
+                    delay: float = random.uniform(*retry_delay) * min(2 ** (attempt - 1), 30)
+                    await self._reset_session_if_needed(skip_header_regeneration)
+                    await asyncio.sleep(delay)
+                    continue
+                raise ServerError(
+                    f"The request failed after {max_retries} attempts to {target_url}"
+                ) from error
+
+        raise ServerError(f"Unreachable code: all {max_retries} attempts have been exhausted")
+
+    async def _parse_response(self, response: aiohttp.ClientResponse) -> dict[str, Any] | list[Any] | str:
+        content_type: str = response.headers.get('Content-Type', '').lower()
+        
+        result = {
+            "status_code": response.status,
+            "url": str(response.url),
+            "data": None,
+            "text": ""
+        }
+        
+        try:
+            text: str = await response.text()
+            result["text"] = text
+            
+            try:
+                json_data = json.loads(text)
+                result["data"] = json_data
+            except json.JSONDecodeError:
+                pass
+            
+            if 'application/json' in content_type or 'json' in content_type:
+                if result["data"] is None:
+                    raise json.JSONDecodeError("JSON expected but not parsed", "", 0)
+                    
+        except json.JSONDecodeError as e:
+            log.warning(f"JSON decode failed: {e}")
+        except Exception as e:
+            log.error(f"Error parsing response: {str(e)}")
+            result["text"] = "Failed to parse response"
+        
+        return result
+    
+    @staticmethod
+    async def _verify_response(response: aiohttp.ClientResponse, response_data: dict[str, Any] | list[Any] | str) -> None:
+        status_code: int = response.status
+        
+        information_responses: range = range(100, 200)
+        successful_responses: range = range(200, 300)
+        redirection_responses: range = range(300, 400)
+        client_errors: range = range(400, 500)
+        server_errors: range = range(500, 600)
+        
+        if status_code not in successful_responses:
+            if status_code in client_errors:
+                if status_code == 400:
+                    error_msg: str = "Invalid request"
+                elif status_code == 401:
+                    error_msg: str = "Not authorized"
+                elif status_code == 403:
+                    error_msg: str = "Access denied"
+                elif status_code == 404:
+                    error_msg: str = "Resource not found"
+                elif status_code == 429:
+                    error_msg: str = "Too many requests"
+                    raise SessionRateLimited(f"{error_msg}: {status_code}", response_data)
+                else:
+                    error_msg: str = f"Client error"
+                    
+                if status_code != 429:
+                    raise HttpStatusError(f"{error_msg}: {status_code}", status_code, response_data)
+            
+            elif status_code in server_errors:
+                raise ServerError(f"Server error: {status_code}", response_data)
+            
+            elif status_code in redirection_responses:
+                log.warning(f"Redirection received: {status_code}")
+            
+            elif status_code in information_responses:
+                log.debug(f"Information response received: {status_code}")
+            
+            else:
+                raise HttpStatusError(f"Unexpected HTTP code: {status_code}", status_code, response_data)
+        
+        if isinstance(response_data, dict):
+            status: bool | str | None = response_data.get("status")
+            
+            if isinstance(status, bool) and not status:
+                raise APIError(f"API returned an invalid status: {response_data}", response_data)
+                
+            if isinstance(status, str) and status.lower() == "failed":
+                raise APIError(f"API reported a failed status: {response_data}", response_data)
+            
+            if response_data.get("success") is False:
+                raise APIError(f"API returned an unsuccessful response: {response_data}", response_data)
+            
+            status_code_in_body: int | None = response_data.get("statusCode")
+            if status_code_in_body and status_code_in_body not in {200, 201, 202, 204}:
+                raise APIError(f"Invalid status code in response body: {status_code_in_body}", response_data)
+        
+        elif isinstance(response_data, list):
+            if not response_data:
+                log.debug("An empty response array is received")

@@ -5,6 +5,9 @@
 """
 
 
+# en: Account shuffle flag | ru: Флаг перетасовки аккаунтов
+shuffle_flag = True
+
 # en: Recruiting referrals settings | ru: Настройки рекрутинга рефералов
 """
     en: Number of threads for referral recruiting (default: 1)
@@ -64,13 +67,13 @@ sleep_between_repeated_token_requests = {"min_sec": 10, "max_sec": 15}
     en: Sleep after referral binding
     ru: Сон после привязки реферального кода
 """
-sleep_after_referral_bind = {"min_sec": 60, "max_sec": 120}
+sleep_after_referral_bind = {"min_sec": 10, "max_sec": 30}
 
 """
     en: Sleep after creating a username
     ru: Сон после создания имени пользователя
 """
-sleep_after_username_creation = {"min_sec": 60, "max_sec": 120}
+sleep_after_username_creation = {"min_sec": 10, "max_sec": 30}
 
 """
     en: Sleep after connecting a Telegram account

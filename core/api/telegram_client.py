@@ -39,8 +39,7 @@ class TelegramClient(Wallet):
         
         self.api_client = BaseAPIClient(
             base_url=self.OAUTH_BASE_URL,
-            proxy=account.proxy,
-            session_lifetime=5
+            proxy=account.proxy
         )
         self.form_session = None
         self.cookies = {}

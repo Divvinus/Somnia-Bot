@@ -37,15 +37,15 @@ class StatsResponse:
     @classmethod
     def from_json(cls, data: Dict[str, Any]) -> 'StatsResponse':
         return cls(
-            total_points=data.get('totalPoints', 0),
-            total_boosters=data.get('totalBoosters', 0),
-            final_points=data.get('finalPoints', 0),
-            rank=data.get('rank', 'N/A'),
+            total_points=float(data.get('totalPoints', 0)),
+            total_boosters=float(data.get('totalBoosters', 0)),
+            final_points=float(data.get('finalPoints', 0)),
+            rank=data.get('rank', 'N/A') or 'N/A',
             season_id=data.get('seasonId', 'N/A'),
-            total_referrals=data.get('totalReferrals', 0),
-            quests_completed=data.get('questsCompleted', 0),
-            daily_booster=data.get('dailyBooster', 0),
-            streak_count=data.get('streakCount', 0),
+            total_referrals=int(data.get('totalReferrals', 0)),
+            quests_completed=int(data.get('questsCompleted', 0)),
+            daily_booster=float(data.get('dailyBooster', 0)),
+            streak_count=int(data.get('streakCount', 0)),
             referral_code=data.get('referralCode', 'N/A')
         )
 
@@ -80,6 +80,17 @@ class SomniaClient:
     def wallet_address(self) -> str:
         """Cached wallet address"""
         return self.wallet.wallet_address
+    
+    async def __aenter__(self):
+        """Support for async context manager protocol"""
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Properly close resources when exiting the context"""
+        if hasattr(self, 'api') and self.api:
+            if hasattr(self.api, 'session') and self.api.session:
+                await self.api._safely_close_session(self.api.session)
+                self.api.session = None
 
     async def get_signature(self, *args, **kwargs) -> str:
         """Getting signature"""
@@ -132,10 +143,11 @@ class SomniaClient:
                     headers=self._get_base_headers(auth=False, custom_referer=custom_referer),
                     verify=False
                 )
-                if response.status_code == 500:
+                
+                if response.get("status_code") == 500:
                     continue
                     
-                token = response.json().get("token")
+                token = response.get("data").get("token")
                 if not token:
                     log.error(f"Account {self.wallet_address} | No token in response")
                     return False
@@ -155,7 +167,7 @@ class SomniaClient:
                 method="/stats",
                 headers=self._get_base_headers()
             )
-            stats = StatsResponse.from_json(response.json())
+            stats = StatsResponse.from_json(response['data'])
             
             referral_code = await self.get_me_info(get_referral_code=True)
             if referral_code:
@@ -169,15 +181,24 @@ class SomniaClient:
             return None
 
     async def get_me_info(self, get_referral_code: bool = False) -> Optional[Union[str, Dict[str, None]]]:
-        """Getting user information with caching"""
         try:
             if self._me_info_cache is None:
                 response = await self.send_request(
                     request_type="GET",
                     method="/users/me",
                     headers=self._get_base_headers(),
+                    verify=False
                 )
-                self._me_info_cache = response.json()
+                
+                if response.get("status_code") != 200:
+                    log.error(f"Account {self.wallet_address} | Server error: {response.get('status_code')}")
+                    return None
+                    
+                if response.get("data") is None:
+                    log.error(f"Account {self.wallet_address} | No data in response")
+                    return None
+
+                self._me_info_cache = response.get("data")
 
             if get_referral_code:
                 return self._me_info_cache.get("referralCode")
@@ -203,12 +224,11 @@ class SomniaClient:
                     headers=self._get_base_headers(),
                     verify=False
                 )
-                
-                if response.status_code == 200:
+                if response.get("status_code") == 200:
                     log.success(f"Account {self.wallet_address} | Account activated")
                     return True
                     
-                if response.status_code == 500:
+                if response.get("status_code") == 500:
                     log.warning(
                         f"Account {self.wallet_address} | Server error, "
                         f"retrying... (attempt {attempt + 1}/{self.config.MAX_RETRIES})"
@@ -222,7 +242,7 @@ class SomniaClient:
                     
                 log.error(
                     f"Account {self.wallet_address} | "
-                    f"Activation failed: {response.json()}"
+                    f"Activation failed: {response}"
                 )
                 return False
                 

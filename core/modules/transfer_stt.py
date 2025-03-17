@@ -13,10 +13,6 @@ from loader import config
 
 
 class TransferSTTModule(Wallet):
-    """
-    Module for executing STT transactions on Somnia testnet network.
-    Provides address generation and transfer execution based on balance.
-    """
     MINIMUM_BALANCE = 0.001
     GAS_LIMIT = 21000
     

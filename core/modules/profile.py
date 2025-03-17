@@ -18,12 +18,17 @@ from config.settings import (
 
 
 class ProfileModule(SomniaClient):
-    def __init__(self, account: Account, referral_code: str = ""):
+    def __init__(self, account: Account, referral_code: str):
         super().__init__(account)
         self.twitter_worker = TwitterClient(account)
         self.telegram_worker = TelegramClient(account)
         self.account = account
-        self.referral_code = referral_code
+        
+        if referral_code:
+            self.referral_code = referral_code
+        else:
+            self.referral_code = "AB22F8C8"
+            
         self._me_info_cache: Optional[Dict] = None
         self._discord_worker = None
 
@@ -36,9 +41,7 @@ class ProfileModule(SomniaClient):
     @cached_property
     def _base_headers(self) -> Dict[str, str]:
         return {
-            "authority": "quest.somnia.network",
             "accept": "application/json",
-            "dnt": "1",
             "authorization": f"Bearer {self._authorization_token}",
             "content-type": "application/json",
             "origin": "https://quest.somnia.network",
@@ -65,13 +68,13 @@ class ProfileModule(SomniaClient):
                     verify=False,
                 )
 
-                if response.status_code in [200, 201, 204]:
+                if response.get('status_code') in [200, 201, 204]:
                     log.info(f"Account {self.wallet_address} | Created username {username}")
                     self._me_info_cache = None
                     return True
 
                 log.warning(
-                    f"Account {self.wallet_address} | Failed to create username {username}. Status: {response.status_code}. Let's try again..."
+                    f"Account {self.wallet_address} | Failed to create username {username}. Status: {response.get('status_code')}. Let's try again..."
                 )
                 await asyncio.sleep(2)
 
@@ -104,7 +107,7 @@ class ProfileModule(SomniaClient):
                 headers=headers
             )
             
-            success = response.status_code == 200 and response.json().get("success", False)
+            success = response.get('status_code') == 200 and response.get("success", False)
             if success:
                 log.success(f"Account {self.wallet_address} | Telegram account connected successfully")
                 self._me_info_cache = None
@@ -135,7 +138,7 @@ class ProfileModule(SomniaClient):
                 json_data={"code": code, "provider": "discord"}
             )
 
-            success = response.status_code == 200 and response.json().get("success", False)
+            success = response.get('status_code') == 200 and response.get("success", False)
             if success:
                 log.success(f"Account {self.wallet_address} | Discord account connected successfully")
                 self._me_info_cache = None
@@ -175,7 +178,7 @@ class ProfileModule(SomniaClient):
                 headers=headers,
             )
 
-            success = response.status_code == 200 and response.json().get("success", False)
+            success = response.get('status_code') == 200 and response.get("success", False)
             if success:
                 log.success(f"Account {self.wallet_address} | Twitter account connected successfully")
                 self._me_info_cache = None
@@ -207,18 +210,18 @@ class ProfileModule(SomniaClient):
                 "priority": "u=1, i",
                 "referer": f"https://quest.somnia.network/referrals/{self.referral_code}",
             }
-
-            json_data = {**payload, "signature": signature}
+            
+            json_data = {**payload, "signature": f'0x{signature}'}
 
             response = await self.send_request(
                 request_type="POST",
                 method="/users/referrals",
                 json_data=json_data,
                 headers=headers,
-                verify=False,
+                verify=False
             )
             
-            if response.status_code == 200:
+            if response.get('status_code') == 200:
                 log.success(f"Account {self.wallet_address} | Referral code bound to the account")
 
         except Exception as e:
@@ -255,7 +258,7 @@ class ProfileModule(SomniaClient):
             null_fields = await self.get_me_info()
             if null_fields is None:
                 log.success(f"Account {self.wallet_address} | Profile setup completed successfully")
-                return False
+                return True
                          
             if "username" in null_fields:
                 if not await self.create_username():
@@ -263,28 +266,28 @@ class ProfileModule(SomniaClient):
                 await random_sleep(self.wallet_address, **sleep_after_username_creation)
                 
             # Connect Telegram if session is available
-            if "telegramName" in null_fields and self.account.telegram_session:
-                if not await self.connect_telegram_account():
-                    return False
-                await random_sleep(self.wallet_address, **sleep_after_telegram_connection)
+            # if "telegramName" in null_fields and self.account.telegram_session:
+            #     if not await self.connect_telegram_account():
+            #         return False
+            #     await random_sleep(self.wallet_address, **sleep_after_telegram_connection)
 
-            # Connect Discord if token is available
-            if "discordName" in null_fields and self.account.auth_tokens_discord:
-                if not await self.connect_discord_account():
-                    return False
-                await random_sleep(self.wallet_address, **sleep_after_discord_connection)
+            # # Connect Discord if token is available
+            # if "discordName" in null_fields and self.account.auth_tokens_discord:
+            #     if not await self.connect_discord_account():
+            #         return False
+            #     await random_sleep(self.wallet_address, **sleep_after_discord_connection)
 
-            # Connect Twitter if token is available
-            if "twitterName" in null_fields and self.account.auth_tokens_twitter:
-                if not await self.connect_twitter_account():
-                    return False
-                await random_sleep(self.wallet_address, **sleep_after_twitter_connection)
+            # # Connect Twitter if token is available
+            # if "twitterName" in null_fields and self.account.auth_tokens_twitter:
+            #     if not await self.connect_twitter_account():
+            #         return False
+            #     await random_sleep(self.wallet_address, **sleep_after_twitter_connection)
                 
             # Setting up a profile picture
-            if "imgUrl" in null_fields:
-                if not await self.installing_photo_profile():
-                    return False
-                await random_sleep(self.wallet_address, **sleep_after_after_installing_photo_profile)                
+            # if "imgUrl" in null_fields:
+            #     if not await self.installing_photo_profile():
+            #         return False
+            #     await random_sleep(self.wallet_address, **sleep_after_after_installing_photo_profile)                
 
             # Check if we need to activate referral
             referral_code = await self.get_me_info(get_referral_code=True)          

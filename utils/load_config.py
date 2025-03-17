@@ -12,6 +12,7 @@ from better_proxy import Proxy
 from core.exceptions.base import ConfigurationError
 from logger import log
 from models import Account, Config
+from config.settings import shuffle_flag
 
 
 @dataclass
@@ -219,7 +220,8 @@ class ConfigLoader:
             if not accounts:
                 raise ConfigurationError("No valid accounts found")
                 
-            random.shuffle(accounts)
+            if shuffle_flag:
+                random.shuffle(accounts)
             return Config(accounts=accounts, **params)
 
         except ConfigurationError as e:
