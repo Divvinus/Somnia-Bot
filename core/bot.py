@@ -3,11 +3,6 @@ from loader import config
 from models import Account
 
 class SomniaBot:
-    """
-    Bot for interacting with Somnia platform features.
-    
-    Provides static methods to process various account operations.
-    """
     
     @staticmethod
     async def process_get_referral_code(account: Account) -> tuple[bool, str]:
