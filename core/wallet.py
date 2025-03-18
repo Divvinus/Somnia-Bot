@@ -93,9 +93,11 @@ class Wallet(AsyncWeb3, Account):
         if isinstance(contract, str):
             address = self._get_checksum_address(contract)
             if address not in self._contracts_cache:
+                temp_contract = ERC20Contract(address="")
+                abi = await temp_contract.get_abi()
                 self._contracts_cache[address] = self.eth.contract(
                     address=address,
-                    abi=ERC20Contract().abi
+                    abi=abi
                 )
             return self._contracts_cache[address]
         

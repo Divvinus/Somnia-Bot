@@ -67,8 +67,13 @@ class SomniaBot:
         return await module.run()
     
     @staticmethod
-    async def process_mint_nft(account: Account) -> tuple[bool, str]:    
-        async with MintNftModule(account, config.somnia_rpc) as module:
+    async def process_mint_ping_pong(account: Account) -> tuple[bool, str]:    
+        async with MintPingPongModule(account, config.somnia_rpc) as module:
+            return await module.run()
+    
+    @staticmethod
+    async def process_swap_ping_pong(account: Account) -> tuple[bool, str]:    
+        async with SmapPingPongModule(account, config.somnia_rpc) as module:
             return await module.run()
         
     @staticmethod

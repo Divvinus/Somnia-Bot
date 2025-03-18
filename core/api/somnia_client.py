@@ -86,11 +86,9 @@ class SomniaClient:
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Properly close resources when exiting the context"""
-        if hasattr(self, 'api') and self.api:
-            if hasattr(self.api, 'session') and self.api.session:
-                await self.api._safely_close_session(self.api.session)
-                self.api.session = None
+        if self.api and self.api.session:
+            await self.api._safely_close_session(self.api.session)
+            self.api.session = None
 
     async def get_signature(self, *args, **kwargs) -> str:
         """Getting signature"""

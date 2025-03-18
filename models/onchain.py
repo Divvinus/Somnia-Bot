@@ -70,20 +70,28 @@ class ERC20Contract(BaseContract):
     """ERC-20 contract with optimized ABI loading"""
     address: str = ""
     abi_file: str = "erc_20.json"
+    
+@dataclass
+class PingPongRouterContract(ERC20Contract):
+    address: str = Web3.to_checksum_address("0x6aac14f090a35eea150705f72d90e4cdc4a49b2c")
+    abi_file: str = "ping_pong_router.json"
 
+@dataclass
+class PingTokensContract(ERC20Contract):
+    address: str = Web3.to_checksum_address("0x33e7fab0a8a5da1a923180989bd617c9c2d1c493")
+    abi_file: str = "erc_721.json"
+
+@dataclass
+class PongTokensContract(ERC20Contract):
+    address: str = Web3.to_checksum_address("0x9beaA0016c22B646Ac311Ab171270B0ECf23098F")
+    abi_file: str = "erc_721.json"
+    
+@dataclass
+class UsdtTokensContract(ERC20Contract):
+    address: str = Web3.to_checksum_address("0x65296738d4e5edb1515e40287b6fdf8320e6ee04")
+    abi_file: str = "erc_721.json"
+    
 @dataclass
 class NFTContract(BaseContract):
     """Base NFT contract (ERC-721)"""
     abi_file: str = "erc_721.json"
-
-@dataclass
-class PingNFTContract(NFTContract):
-    address: str = Web3.to_checksum_address("0x33e7fab0a8a5da1a923180989bd617c9c2d1c493")
-
-@dataclass
-class PongNFTContract(NFTContract):
-    address: str = Web3.to_checksum_address("0x9beaA0016c22B646Ac311Ab171270B0ECf23098F")
-    
-@dataclass
-class FaucetUsdtContract(NFTContract):
-    address: str = Web3.to_checksum_address("0x65296738d4e5edb1515e40287b6fdf8320e6ee04")

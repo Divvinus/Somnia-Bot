@@ -1,7 +1,7 @@
 from loader import config
 from logger import log
 from core.wallet import Wallet
-from models import Account, FaucetUsdtContract
+from models import Account, UsdtTokensContract
 from utils.logger_trx import show_trx_log
 
 
@@ -13,7 +13,7 @@ class FaucetUsdtModule(Wallet):
         log.info(f"Account {self.wallet_address} | Processing request 1000 sUSDT...")
         
         try:    
-            contract = await self.get_contract(FaucetUsdtContract())
+            contract = await self.get_contract(UsdtTokensContract())
             
             balance = await contract.functions.balanceOf(self.wallet_address).call()
             

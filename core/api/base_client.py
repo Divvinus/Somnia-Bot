@@ -98,13 +98,13 @@ class BaseAPIClient:
                 
                 if not skip_header_regeneration:
                     self._headers = self._generate_headers()
-                
+                    
                 self.session = aiohttp.ClientSession(
-                    connector=self._connector, 
+                    connector=self._connector,
                     timeout=aiohttp.ClientTimeout(total=120),
                     headers=self._headers
                 )
-                
+                        
                 asyncio.create_task(self._safely_close_session(old_session))
 
     @staticmethod
