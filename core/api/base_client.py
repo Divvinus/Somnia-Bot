@@ -93,18 +93,20 @@ class BaseAPIClient:
 
     async def _reset_session_if_needed(self, skip_header_regeneration: bool = False) -> None:
         async with self._lock:
-            if self.session is not None:
-                old_session: aiohttp.ClientSession = self.session
+            old_session = None
+            if self.session is not None and not self.session.closed:
+                old_session = self.session
                 
-                if not skip_header_regeneration:
-                    self._headers = self._generate_headers()
+            if not skip_header_regeneration:
+                self._headers = self._generate_headers()
+                
+            self.session = aiohttp.ClientSession(
+                connector=self._connector,
+                timeout=aiohttp.ClientTimeout(total=120),
+                headers=self._headers
+            )
                     
-                self.session = aiohttp.ClientSession(
-                    connector=self._connector,
-                    timeout=aiohttp.ClientTimeout(total=120),
-                    headers=self._headers
-                )
-                        
+            if old_session:
                 asyncio.create_task(self._safely_close_session(old_session))
 
     @staticmethod
@@ -172,6 +174,9 @@ class BaseAPIClient:
 
         for attempt in range(1, max_retries + 1):
             try:
+                if not self.session or self.session.closed:
+                    await self._reset_session_if_needed(skip_header_regeneration)
+    
                 if self.session and self.session.closed:
                     await self._reset_session_if_needed(skip_header_regeneration)
                 
