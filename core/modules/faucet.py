@@ -28,17 +28,24 @@ class FaucetModule(Wallet, BaseAPIClient):
         headers = self._get_headers()
         json_data = {'address': self.wallet_address}
 
-        response = await self.send_request(
-            request_type="POST", 
-            method="/api/faucet", 
-            json_data=json_data, 
-            headers=headers,
-            max_retries=1,
-            verify=False
-        )
-        
-        if await self._handle_response(response):
-            return True
+        while True:
+            response = await self.send_request(
+                request_type="POST", 
+                method="/api/faucet", 
+                json_data=json_data, 
+                headers=headers,
+                max_retries=1,
+                verify=False
+            )
+            
+            if response.get("data").get("error"):
+                error_message = response.get("data").get("error")
+                if error_message == "Bot detected":
+                    log.warning(f"Account {self.wallet_address} | The address you provided is suspected to be a bot")
+                    return False
+            
+            if await self._handle_response(response):
+               return True
 
     def _get_headers(self) -> Dict[str, str]:
        return {
@@ -56,8 +63,8 @@ class FaucetModule(Wallet, BaseAPIClient):
 
     async def _handle_response(self, response: Dict[str, Any]) -> bool:
         if response.get("status_code") == 403:
-                log.warning(f"Account {self.wallet_address} | First register an account with the Somnia project, then come back and request tokens")
-                return False
+            log.warning(f"Account {self.wallet_address} | First register an account with the Somnia project, then come back and request tokens")
+            return False
             
         if response.get("data").get("error"):
             error_message = response.get("data").get("error")
