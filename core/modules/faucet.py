@@ -28,18 +28,17 @@ class FaucetModule(Wallet, BaseAPIClient):
         headers = self._get_headers()
         json_data = {'address': self.wallet_address}
 
-        while True:
-            response = await self.send_request(
-                request_type="POST", 
-                method="/api/faucet", 
-                json_data=json_data, 
-                headers=headers,
-                max_retries=1,
-                verify=False
-            )
-            
-            if await self._handle_response(response):
-               return True
+        response = await self.send_request(
+            request_type="POST", 
+            method="/api/faucet", 
+            json_data=json_data, 
+            headers=headers,
+            max_retries=1,
+            verify=False
+        )
+        
+        if await self._handle_response(response):
+            return True
 
     def _get_headers(self) -> Dict[str, str]:
        return {
