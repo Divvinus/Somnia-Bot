@@ -46,7 +46,7 @@ class FaucetModule(Wallet, BaseAPIClient):
             
             if await self._handle_response(response):
                return True
-
+           
     def _get_headers(self) -> Dict[str, str]:
        return {
            'accept': '*/*',
@@ -64,6 +64,7 @@ class FaucetModule(Wallet, BaseAPIClient):
     async def _handle_response(self, response: Dict[str, Any]) -> bool:
         if response.get("status_code") == 403:
             log.warning(f"Account {self.wallet_address} | First register an account with the Somnia project, then come back and request tokens")
+            await random_sleep(self.wallet_address, **sleep_between_repeated_token_requests)
             return False
             
         if response.get("data").get("error"):
@@ -77,6 +78,7 @@ class FaucetModule(Wallet, BaseAPIClient):
                 return False
             else:
                 log.error(f"Account {self.wallet_address} | {response}")
+                await random_sleep(self.wallet_address, **sleep_between_repeated_token_requests)
                 return False
         else:
             log.success(f"Account {self.wallet_address} | Successfully requested test tokens")
