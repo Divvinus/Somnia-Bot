@@ -25,10 +25,9 @@ class Console:
         "💸 Transfer STT",
         "🏓 Mint $Ping and $Pong",
         "💱 Swap $Ping and $Pong",
-        "🚰 Faucet $sUSDT",
-        # "👥 Socials quests 1",
-        # "👥 Socials quests 2",
-        # "🤖 Recruiting referrals",
+        "🚰 Mint $sUSDT",
+        # "💬 Send and mint message nft",
+        '🍀 Quest: "Somnia Testnet Odyssey - Sharing is Caring"',
         "🚪 Exit",
     )
     
@@ -40,10 +39,9 @@ class Console:
         "💸 Transfer STT": "transfer_stt",
         "🏓 Mint $Ping and $Pong": "mint_ping_pong",
         "💱 Swap $Ping and $Pong": "swap_ping_pong",
-        "🚰 Faucet $sUSDT": "faucet_usdt",
-        # "👥 Socials quests 1": "socials_quests_1",
-        # "👥 Socials quests 2": "socials_quests_2",
-        # "🤖 Recruiting referrals": "recruiting_referrals",
+        "🚰 Mint $sUSDT": "mint_usdt",
+        # "💬 Send and mint message nft": "mint_message_nft",
+        '🍀 Quest: "Somnia Testnet Odyssey - Sharing is Caring"': "quest_sharing",
         "🚪 Exit": "exit"
     }
 

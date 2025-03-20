@@ -12,7 +12,7 @@ threads: 1
 somnia_rpc: https://dream-rpc.somnia.network
 
 # Somnia Testnet Explorer
-somnia_explorer: https://somnia-testnet.socialscan.io/
+somnia_explorer: https://shannon-explorer.somnia.network/
 
 
 #------------------------------------------------------------------------------
@@ -23,29 +23,6 @@ delay_before_start:
     min: 0
     max: 0
 
-
-#------------------------------------------------------------------------------
-# en: Api keys for captcha solving requests  | ru: Api ключи для запросов на решение капчи 
-#------------------------------------------------------------------------------
-
-# https://capmonster.cloud
-cap_monster: ""
-
-# https://2captcha.com/
-two_captcha: ""
-
-# https://www.capsolver.com/
-capsolver: ""
-
-
-#------------------------------------------------------------------------------
-# en: Telegram API hash and ID | ru: Telegram API hash и ID
-#------------------------------------------------------------------------------
-
-# https://my.telegram.org/apps 
-
-telegram_api_id: ""
-telegram_api_hash: ""
 
 #------------------------------------------------------------------------------
 # en: List of tokens in the network Somnia Devnet | ru: Список токенов в сети Somnia Devnet

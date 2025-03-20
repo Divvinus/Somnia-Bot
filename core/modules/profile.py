@@ -10,15 +10,14 @@ from utils import generate_username, random_sleep
 from config.settings import (
     sleep_after_referral_bind,
     sleep_after_username_creation,
-    sleep_after_telegram_connection,
-    sleep_after_discord_connection,
-    sleep_after_twitter_connection,
-    sleep_after_after_installing_photo_profile
+    # sleep_after_discord_connection,
+    # sleep_after_twitter_connection,
+    # sleep_after_after_installing_photo_profile
 )
 
 
 class ProfileModule(SomniaClient):
-    def __init__(self, account: Account, referral_code: str):
+    def __init__(self, account: Account, referral_code: str | None = None):
         super().__init__(account)
         # self.twitter_worker = TwitterClient(account)
         # self.telegram_worker = TelegramClient(account)

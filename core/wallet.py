@@ -52,18 +52,6 @@ class Wallet(AsyncWeb3, Account):
         
     @staticmethod
     def _initialize_keypair(private_key: str) -> Account:
-        """
-        Create account from private key or mnemonic.
-        
-        Args:
-            private_key: Wallet private key or mnemonic phrase
-            
-        Returns:
-            Account object
-            
-        Raises:
-            WalletError: If private key is empty
-        """
         if not private_key:
             raise WalletError("Empty private_key provided")
         return (Account.from_mnemonic(private_key) 
@@ -72,21 +60,11 @@ class Wallet(AsyncWeb3, Account):
 
     @property
     def wallet_address(self) -> ChecksumAddress:
-        """Get checksummed wallet address."""
         return self.keypair.address
 
     @staticmethod
     @lru_cache(maxsize=1000)
     def _get_checksum_address(address: str) -> ChecksumAddress:
-        """
-        Convert address to checksum format with caching.
-        
-        Args:
-            address: Ethereum address
-            
-        Returns:
-            Checksummed address
-        """
         return AsyncWeb3.to_checksum_address(address)
 
     async def get_contract(self, contract: Union[BaseContract, str, object]) -> AsyncContract:
@@ -123,15 +101,6 @@ class Wallet(AsyncWeb3, Account):
         raise TypeError("Invalid contract type: expected BaseContract, str, or contract-like object")
 
     async def token_balance(self, token_address: str) -> int:
-        """
-        Get token balance for wallet address.
-        
-        Args:
-            token_address: ERC-20 token address
-            
-        Returns:
-            Token balance in smallest units
-        """
         contract = await self.get_contract(token_address)
         return await contract.functions.balanceOf(
             self._get_checksum_address(self.keypair.address)
@@ -139,28 +108,9 @@ class Wallet(AsyncWeb3, Account):
 
     @staticmethod
     def _is_native_token(token_address: str) -> bool:
-        """
-        Check if address represents native token.
-        
-        Args:
-            token_address: Token address to check
-            
-        Returns:
-            True if native token, False otherwise
-        """
         return token_address in (ZERO_ADDRESS, ETH_ADDRESS)
 
     async def convert_amount_to_decimals(self, amount: float, token_address: str) -> int:
-        """
-        Convert human-readable amount to token-specific decimals.
-        
-        Args:
-            amount: Amount in human-readable form
-            token_address: Token address
-            
-        Returns:
-            Amount converted to smallest token units
-        """
         token_address = self._get_checksum_address(token_address)
         
         if self._is_native_token(token_address):
@@ -171,16 +121,6 @@ class Wallet(AsyncWeb3, Account):
         return int(Decimal(str(amount)) * Decimal(str(10 ** decimals)))
     
     async def convert_amount_from_decimals(self, amount: int, token_address: str) -> float:
-        """
-        Convert token-specific decimals to human-readable amount.
-        
-        Args:
-            amount: Amount in smallest token units
-            token_address: Token address
-            
-        Returns:
-            Human-readable token amount
-        """
         token_address = self._get_checksum_address(token_address)
         
         if self._is_native_token(token_address):
@@ -191,35 +131,18 @@ class Wallet(AsyncWeb3, Account):
         return float(Decimal(str(amount)) / Decimal(str(10 ** decimals)))
 
     async def transactions_count(self) -> Nonce:
-        """Get number of transactions sent from wallet address."""
         return await self.eth.get_transaction_count(self.keypair.address)
 
     async def check_balance(self) -> None:
-        """
-        Verify wallet has non-zero ETH balance.
-        
-        Raises:
-            InsufficientFundsError: If balance is zero
-        """
         balance = await self.eth.get_balance(self.keypair.address)
         if balance <= 0:
             raise InsufficientFundsError("ETH balance is empty")
 
     async def human_balance(self) -> float:
-        """Get ETH balance in human-readable form."""
         balance = await self.eth.get_balance(self.keypair.address)
         return float(self.from_wei(balance, "ether"))
 
     async def _build_base_transaction(self, contract_function: Any) -> TxParams:
-        """
-        Create transaction parameters for contract function.
-        
-        Args:
-            contract_function: Contract function to call
-            
-        Returns:
-            Transaction parameters
-        """
         gas_estimate = await contract_function.estimate_gas({"from": self.keypair.address})
         return {
             "gasPrice": await self.eth.gas_price,
@@ -228,15 +151,6 @@ class Wallet(AsyncWeb3, Account):
         }
 
     async def check_trx_availability(self, transaction: TxParams) -> None:
-        """
-        Check if enough ETH balance for transaction.
-        
-        Args:
-            transaction: Transaction parameters
-            
-        Raises:
-            InsufficientFundsError: If balance too low
-        """
         balance = await self.human_balance()
         required = float(self.from_wei(int(transaction.get('value', 0)), "ether"))
 
@@ -246,15 +160,6 @@ class Wallet(AsyncWeb3, Account):
             )
 
     async def _process_transaction(self, transaction: Any) -> Tuple[bool, str]:
-        """
-        Send transaction and handle errors.
-        
-        Args:
-            transaction: Transaction to send
-            
-        Returns:
-            Tuple of (success_status, result_or_error)
-        """
         try:
             status, result = await self.send_and_verify_transaction(transaction)
             return status, result
@@ -262,31 +167,12 @@ class Wallet(AsyncWeb3, Account):
             return False, str(error)
 
     async def get_signature(self, text: str, private_key: Optional[str] = None) -> HexStr:
-        """
-        Sign message with wallet private key.
-        
-        Args:
-            text: Message to sign
-            private_key: Optional alternative private key
-            
-        Returns:
-            Signature as hex string
-        """
         encoded_message = encode_defunct(text=text)
         signing_keypair = (self.from_key(private_key) if private_key else self.keypair)
         signature = signing_keypair.sign_message(encoded_message)
         return HexStr(signature.signature.hex())
 
     async def send_and_verify_transaction(self, trx: Any) -> Tuple[bool, str]:
-        """
-        Sign, send and wait for transaction confirmation.
-        
-        Args:
-            trx: Transaction to send
-            
-        Returns:
-            Tuple of (success_status, transaction_hash)
-        """
         signed = self.keypair.sign_transaction(trx)
         tx_hash = await self.eth.send_raw_transaction(signed.raw_transaction)
         receipt = await self.eth.wait_for_transaction_receipt(tx_hash)
@@ -298,17 +184,6 @@ class Wallet(AsyncWeb3, Account):
         spender_address: str, 
         amount: int
     ) -> Tuple[bool, str]:
-        """
-        Check token allowance and approve if needed.
-        
-        Args:
-            token_address: Token address
-            spender_address: Address to approve spending
-            amount: Amount to approve
-            
-        Returns:
-            Tuple of (success_status, result_message)
-        """
         try:
             token_contract = await self.get_contract(token_address)
             
@@ -330,6 +205,8 @@ class Wallet(AsyncWeb3, Account):
                 "from": self.wallet_address,
             })
 
+            await asyncio.sleep(5)
+            
             success, result = await self._process_transaction(approve_tx)
             if not success:
                 raise WalletError(f"Approval failed: {result}")
