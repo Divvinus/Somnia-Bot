@@ -22,12 +22,7 @@ class ProfileModule(SomniaClient):
         # self.twitter_worker = TwitterClient(account)
         # self.telegram_worker = TelegramClient(account)
         self.account = account
-        
-        if referral_code:
-            self.referral_code = referral_code
-        else:
-            self.referral_code = "AB22F8C8"
-            
+        self.referral_code = referral_code            
         self._me_info_cache: Optional[Dict] = None
         self._discord_worker = None
 
@@ -249,8 +244,9 @@ class ProfileModule(SomniaClient):
             
             # Handle referral
             log.info(f"Account {self.wallet_address} | Binding the referral code...")
-            await self.referral_bind()            
-            await random_sleep(self.wallet_address, **sleep_after_referral_bind)
+            if self.referral_code:
+                await self.referral_bind()            
+                await random_sleep(self.wallet_address, **sleep_after_referral_bind)
             
             # Get current user info
             log.info(f"Account {self.wallet_address} | Getting the current user info...")
