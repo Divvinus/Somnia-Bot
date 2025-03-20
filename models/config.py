@@ -77,7 +77,6 @@ class Config(BaseModel):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_assignment=False,
-        frozen=True,
         extra='forbid',
     )
 
