@@ -229,9 +229,9 @@ class BaseAPIClient:
                     raise error
                 else:
                     raise ServerError(
-                        f"The request failed after {max_retries} attempts to {target_url}"
+                        f"The request failed after {max_retries} attempts to {target_url}. Error {error}"
                     ) from error
-
+                    
             except Exception as error:
                 log.error(f"Unexpected error when querying to {target_url}: {type(error).__name__}: {error}")
                 if attempt < max_retries:

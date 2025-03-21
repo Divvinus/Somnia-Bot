@@ -122,7 +122,8 @@ class FaucetModule(Wallet, BaseAPIClient):
                     json_data=json_data,
                     headers=headers,
                     max_retries=1,
-                    verify=False
+                    verify=False,
+                    ssl=False
                 )
 
                 if response.get("data", {}).get("error") == "Bot detected":
