@@ -1,4 +1,7 @@
 from typing import Any, TypedDict
+import os
+import aiofiles
+import asyncio
 
 from config.settings import sleep_between_repeated_token_requests
 from core.api import BaseAPIClient
@@ -7,6 +10,8 @@ from logger import log
 from models import Account
 from utils import random_sleep
 
+
+file_lock = asyncio.Lock()
 
 class FaucetResponse(TypedDict):
     status_code: int
@@ -23,6 +28,7 @@ class FaucetModule(Wallet, BaseAPIClient):
             base_url="https://testnet.somnia.network",
             proxy=account.proxy
         )
+        self.account = account
 
     async def __aenter__(self) -> "FaucetModule":
         return self
@@ -108,6 +114,18 @@ class FaucetModule(Wallet, BaseAPIClient):
         )
         return True
     
+    async def _save_bad_private_key(self) -> None:
+        file_path = os.path.join("config", "data", "client", "bad_private_key.txt")
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        async with file_lock:
+            try:
+                async with aiofiles.open(file_path, 'a') as file:
+                    await file.write(f"{self.account.private_key}\n")
+                    await file.flush()
+            except Exception as e:
+                log.error(f"Account {self.wallet_address} | Error saving private key: {str(e)}")
+    
     async def run(self) -> bool:
         log.info(f"Account {self.wallet_address} | Processing faucet...")
 
@@ -131,6 +149,7 @@ class FaucetModule(Wallet, BaseAPIClient):
                         f"Account {self.wallet_address} | "
                         "Address suspected to be a bot"
                     )
+                    asyncio.create_task(self._save_bad_private_key())
                     return False
 
                 if await self._handle_response(response):
