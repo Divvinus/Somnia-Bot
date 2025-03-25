@@ -21,14 +21,14 @@ async def apply_delay(min_delay: float | int, max_delay: float | int) -> None:
 
 async def process_execution(account: Account, process_func: Callable) -> None:
     address = get_address(account.private_key)
-    
+
     async with semaphore:
         try:
             await apply_delay(
                 config.delay_before_start.min,
                 config.delay_before_start.max
             )
-            
+
             if status := await process_func(account):
                 progress.increment()
                 log.info(
