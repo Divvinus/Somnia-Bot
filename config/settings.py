@@ -57,11 +57,11 @@ sleep_after_username_creation = {"min_sec": 30, "max_sec": 60}
 """
 sleep_between_tasks = {"min_sec": 40, "max_sec": 120}
 
-# """
-#     en: Sleep after connecting a Discord account
-#     ru: Сон после подключения Discord аккаунта
-# """
-# sleep_after_discord_connection = {"min_sec": 120, "max_sec": 180}   
+"""
+    en: Sleep after connecting a Discord account
+    ru: Сон после подключения Discord аккаунта
+"""
+sleep_after_discord_connection = {"min_sec": 120, "max_sec": 180}   
 
 # """
 #     en: Sleep after connecting a Twitter account

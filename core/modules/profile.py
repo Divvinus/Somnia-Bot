@@ -10,7 +10,7 @@ from utils import generate_username, random_sleep
 from config.settings import (
     sleep_after_referral_bind,
     sleep_after_username_creation,
-    # sleep_after_discord_connection,
+    sleep_after_discord_connection,
     # sleep_after_twitter_connection,
     # sleep_after_after_installing_photo_profile
 )
@@ -112,39 +112,42 @@ class ProfileModule(SomniaClient):
     #         log.error(f"Account {self.wallet_address} | Error: {e}")
     #         return False
 
-    # async def connect_discord_account(self) -> bool:
-    #     log.info(f"Account {self.wallet_address} | Trying to link a Discord account to a website...")
-    #     try:
-    #         code = await self.discord_worker._request_authorization()
-    #         if not code:
-    #             return False
+    async def connect_discord_account(self) -> bool:
+        log.info(f"Account {self.wallet_address} | Trying to link a Discord account to a website...")
+        try:
+            code = await self.discord_worker._request_authorization()
+            if not code:
+                return False
 
-    #         headers = {
-    #             **self._base_headers,
-    #             "accept": "*/*",
-    #             "referer": f"https://quest.somnia.network/discord?code={code}&state=eyJ0eXBlIjoiQ09OTkVDVF9ESVNDT1JEIn0%3D",
-    #         }
+            headers = {
+                **self._base_headers,
+                "accept": "*/*",
+                "referer": f"https://quest.somnia.network/discord?code={code}&state=eyJ0eXBlIjoiQ09OTkVDVF9ESVNDT1JEIn0%3D",
+            }
 
-    #         response = await self.send_request(
-    #             request_type="POST",
-    #             method="/auth/socials",
-    #             headers=headers,
-    #             json_data={"code": code, "provider": "discord"}
-    #         )
+            response = await self.send_request(
+                request_type="POST",
+                method="/auth/socials",
+                headers=headers,
+                json_data={"code": code, "provider": "discord"}
+            )
 
-    #         success = response.get('status_code') == 200 and response.get("success", False)
-    #         if success:
-    #             log.success(f"Account {self.wallet_address} | Discord account connected successfully")
-    #             self._me_info_cache = None
-    #         else:
-    #             log.error(f"Account {self.wallet_address} | Failed to connect Discord account")
-    #             log.error(f"Account {self.wallet_address} | Error: {response}")
+            success = (
+                response.get('status_code') == 200 
+                and response.get('data', {}).get("success", False)
+            )
+            if success:
+                log.success(f"Account {self.wallet_address} | Discord account connected successfully")
+                self._me_info_cache = None
+            else:
+                log.error(f"Account {self.wallet_address} | Failed to connect Discord account")
+                log.error(f"Account {self.wallet_address} | Error: {response}")
 
-    #         return success
+            return success
 
-    #     except Exception as e:
-    #         log.error(f"Account {self.wallet_address} | Error: {e}")
-    #         return False
+        except Exception as e:
+            log.error(f"Account {self.wallet_address} | Error: {e}")
+            return False
 
     # async def connect_twitter_account(self) -> bool:
     #     log.info(f"Account {self.wallet_address} | Trying to connect Twitter account...")
@@ -266,11 +269,11 @@ class ProfileModule(SomniaClient):
             #         return False
             #     await random_sleep(self.wallet_address, **sleep_after_telegram_connection)
 
-            # # Connect Discord if token is available
-            # if "discordName" in null_fields and self.account.auth_tokens_discord:
-            #     if not await self.connect_discord_account():
-            #         return False
-            #     await random_sleep(self.wallet_address, **sleep_after_discord_connection)
+            # Connect Discord if token is available
+            if "discordName" in null_fields and self.account.auth_tokens_discord:
+                if not await self.connect_discord_account():
+                    return False
+                await random_sleep(self.wallet_address, **sleep_after_discord_connection)
 
             # # Connect Twitter if token is available
             # if "twitterName" in null_fields and self.account.auth_tokens_twitter:
