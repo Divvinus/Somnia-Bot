@@ -157,7 +157,7 @@ class QuillsDeployContractModule(Wallet):
         if success:
             receipt = await self.eth.wait_for_transaction_receipt(tx_hash)
             deployed_address = receipt['contractAddress']
-            log.info(f"Account {self.wallet_address} | Contract deployed successfully at address: {deployed_address}")
+            log.success(f"Account {self.wallet_address} | Contract deployed successfully at address: {deployed_address}")
             return success, tx_hash
         else:
             log.error(f"Account {self.wallet_address} | Error deploying contract")

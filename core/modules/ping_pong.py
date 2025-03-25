@@ -19,6 +19,13 @@ class MintPingPongModule(Wallet):
     def __init__(self, account: Account, rpc_url: str) -> None:
         super().__init__(account.private_key, rpc_url, account.proxy)
 
+    async def __aenter__(self):
+        await super().__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await super().__aexit__(exc_type, exc_val, exc_tb)
+
     async def _mint_tokens(
         self,
         contract_model: PingTokensContract | PongTokensContract,
@@ -102,6 +109,13 @@ class MintPingPongModule(Wallet):
 class SmapPingPongModule(Wallet):
     def __init__(self, account: Account, rpc_url: str) -> None:
         super().__init__(account.private_key, rpc_url, account.proxy)
+
+    async def __aenter__(self):
+        await super().__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await super().__aexit__(exc_type, exc_val, exc_tb)
 
     async def _calculate_amount(
         self,

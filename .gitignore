@@ -167,3 +167,4 @@ config/data/client/auth_tokens_twitter.txt
 config/data/client/auth_tokens_discord.txt
 config/data/client/bad_private_key.txt
 config/data/client/my_refferal_codes.txt
+config/settings.yaml
