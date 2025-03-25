@@ -11,7 +11,7 @@ from config.settings import (
     sleep_after_referral_bind,
     sleep_after_username_creation,
     sleep_after_discord_connection,
-    # sleep_after_twitter_connection,
+    sleep_after_twitter_connection,
     # sleep_after_after_installing_photo_profile
 )
 
@@ -19,7 +19,7 @@ from config.settings import (
 class ProfileModule(SomniaClient):
     def __init__(self, account: Account, referral_code: str | None = None):
         super().__init__(account)
-        # self.twitter_worker = TwitterClient(account)
+        self.twitter_worker = TwitterClient(account)
         # self.telegram_worker = TelegramClient(account)
         self.account = account
         self.referral_code = referral_code            
@@ -149,45 +149,49 @@ class ProfileModule(SomniaClient):
             log.error(f"Account {self.wallet_address} | Error: {e}")
             return False
 
-    # async def connect_twitter_account(self) -> bool:
-    #     log.info(f"Account {self.wallet_address} | Trying to connect Twitter account...")
-    #     try:
-    #         code = await self.twitter_worker.connect_twitter()
-    #         if not code:
-    #             return False
+    async def connect_twitter_account(self) -> bool:
+        log.info(f"Account {self.wallet_address} | Trying to connect Twitter account...")
+        try:
+            code = await self.twitter_worker.connect_twitter()
+            if not code:
+                return False
 
-    #         headers = {
-    #             **self._base_headers,
-    #             "dnt": "1",
-    #             "referer": f"https://quest.somnia.network/twitter?state=eyJ0eXBlIjoiQ09OTkVDVF9UV0lUVEVSIn0%3D&code={code}",
-    #         }
+            headers = {
+                **self._base_headers,
+                "dnt": "1",
+                "referer": f"https://quest.somnia.network/twitter?state=eyJ0eXBlIjoiQ09OTkVDVF9UV0lUVEVSIn0%3D&code={code}",
+            }
 
-    #         json_data = {
-    #             "code": code,
-    #             "codeChallenge": "challenge123",
-    #             "provider": "twitter",
-    #         }
+            json_data = {
+                "code": code,
+                "codeChallenge": "challenge123",
+                "provider": "twitter",
+            }
 
-    #         response = await self.send_request(
-    #             request_type="POST",
-    #             method="/auth/socials",
-    #             json_data=json_data,
-    #             headers=headers,
-    #         )
+            response = await self.send_request(
+                request_type="POST",
+                method="/auth/socials",
+                json_data=json_data,
+                headers=headers,
+                verify=False
+            )
 
-    #         success = response.get('status_code') == 200 and response.get("success", False)
-    #         if success:
-    #             log.success(f"Account {self.wallet_address} | Twitter account connected successfully")
-    #             self._me_info_cache = None
-    #         else:
-    #             log.error(f"Account {self.wallet_address} | Failed to connect Twitter account")
-    #             log.error(f"Account {self.wallet_address} | Error: {response}")
+            success = (
+                response.get('status_code') == 200 
+                and response.get('data', {}).get("success", False)
+            )
+            if success:
+                log.success(f"Account {self.wallet_address} | Twitter account connected successfully")
+                self._me_info_cache = None
+            else:
+                log.error(f"Account {self.wallet_address} | Failed to connect Twitter account")
+                log.error(f"Account {self.wallet_address} | Error: {response}")
 
-    #         return success
+            return success
 
-    #     except Exception as e:
-    #         log.error(f"Account {self.wallet_address} | Error: {e}")
-    #         return False
+        except Exception as e:
+            log.error(f"Account {self.wallet_address} | Error: {e}")
+            return False
 
     # async def installing_photo_profile(self) -> bool:
         # pass
@@ -276,10 +280,10 @@ class ProfileModule(SomniaClient):
                 await random_sleep(self.wallet_address, **sleep_after_discord_connection)
 
             # # Connect Twitter if token is available
-            # if "twitterName" in null_fields and self.account.auth_tokens_twitter:
-            #     if not await self.connect_twitter_account():
-            #         return False
-            #     await random_sleep(self.wallet_address, **sleep_after_twitter_connection)
+            if "twitterName" in null_fields and self.account.auth_tokens_twitter:
+                if not await self.connect_twitter_account():
+                    return False
+                await random_sleep(self.wallet_address, **sleep_after_twitter_connection)
                 
             # Setting up a profile picture
             # if "imgUrl" in null_fields:
