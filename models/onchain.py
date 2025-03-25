@@ -67,10 +67,54 @@ class BaseContract:
 
 @dataclass
 class ERC20Contract(BaseContract):
-    """ERC-20 contract with optimized ABI loading"""
     address: str = ""
     abi_file: str = "erc_20.json"
+    _bytecode: str | None = None
     
+    _bytecode_path: ClassVar[Path] = Path("./config/data")
+    _bytecode_file: ClassVar[str] = "bytecode_erc_20.txt"
+    _bytecode_cache: ClassVar[dict[str, str]] = {}
+    _bytecode_lock: ClassVar[asyncio.Lock] = asyncio.Lock()
+    
+    @property
+    def bytecode(self) -> str | None:
+        return self._bytecode
+        
+    @bytecode.setter
+    def bytecode(self, value: str | None) -> None:
+        self._bytecode = value
+    
+    async def get_bytecode(self) -> str:
+        if self._bytecode is not None:
+            return self._bytecode
+            
+        cache_key = str(self._bytecode_path / self._bytecode_file)
+        
+        async with self._bytecode_lock:
+            if cache_key in self._bytecode_cache:
+                self._bytecode = self._bytecode_cache[cache_key]
+                return self._bytecode
+                
+            file_path = self._bytecode_path / self._bytecode_file
+            try:
+                async with aiofiles.open(file_path, "r") as f:
+                    bytecode = await f.read()
+                    bytecode = bytecode.strip()
+                    
+                    self._bytecode_cache[cache_key] = bytecode
+                    self._bytecode = bytecode
+                    return bytecode
+                    
+            except FileNotFoundError as e:
+                raise ContractError(f"Bytecode not found: {file_path}") from e
+            except Exception as e:
+                raise ContractError(f"Error reading bytecode: {e}") from e
+    
+    @classmethod
+    async def clear_bytecode_cache(cls) -> None:
+        async with cls._bytecode_lock:
+            cls._bytecode_cache.clear()
+
 @dataclass
 class PingPongRouterContract(ERC20Contract):
     address: str = Web3.to_checksum_address("0x6aac14f090a35eea150705f72d90e4cdc4a49b2c")

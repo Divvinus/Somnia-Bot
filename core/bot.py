@@ -50,6 +50,11 @@ class SomniaBot:
             return await module.run()
 
     @staticmethod
+    async def process_deploy_token_contract(account: Account) -> tuple[bool, str]:
+        async with QuillsDeployContractModule(account) as module:
+            return await module.run()
+
+    @staticmethod
     async def process_quest_sharing(account: Account) -> tuple[bool, str]:
         async with QuestSharingModule(account) as module:
             return await module.run()

@@ -27,6 +27,7 @@ class Console:
         "💱 Swap $Ping and $Pong",
         "🚰 Mint $sUSDT",
         "💬 Send and mint message nft",
+        "🏗  Deploy token contract",
         '🍀 Quest: "Somnia Testnet Odyssey - Sharing is Caring"',
         "🚪 Exit",
     )
@@ -41,6 +42,7 @@ class Console:
         "💱 Swap $Ping and $Pong": "swap_ping_pong",
         "🚰 Mint $sUSDT": "mint_usdt",
         "💬 Send and mint message nft": "mint_message_nft",
+        "🏗  Deploy token contract": "deploy_token_contract",
         '🍀 Quest: "Somnia Testnet Odyssey - Sharing is Caring"': "quest_sharing",
         "🚪 Exit": "exit"
     }
