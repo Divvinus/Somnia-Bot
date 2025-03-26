@@ -311,17 +311,6 @@ class TelegramClient(Wallet):
             return None
 
     async def _process_confirmation_page(self, response_text: str, headers: dict, proxy_url: str | None) -> str | None:
-        """
-        Обрабатывает страницу подтверждения для получения tgAuthResult.
-        
-        Args:
-            response_text: Текст HTML-ответа
-            headers: HTTP заголовки для запроса
-            proxy_url: URL прокси-сервера
-            
-        Returns:
-            tgAuthResult строка в случае успеха, иначе None
-        """
         log.info(f"Account {self.wallet_address} | Confirmation page detected")
         confirm_url_match = re.search(r"confirm_url = '(/auth/auth\?[^']+)'", response_text)
         if not confirm_url_match:

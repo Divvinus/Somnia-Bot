@@ -28,6 +28,7 @@ class Console:
         "🚰 Mint $sUSDT",
         "💬 Send and mint message nft",
         "🏗  Deploy token contract",
+        '🍀 Quest: "Somnia Testnet Odyssey - Socials"',
         '🍀 Quest: "Somnia Testnet Odyssey - Sharing is Caring"',
         "🚪 Exit",
     )
@@ -43,6 +44,7 @@ class Console:
         "🚰 Mint $sUSDT": "mint_usdt",
         "💬 Send and mint message nft": "mint_message_nft",
         "🏗  Deploy token contract": "deploy_token_contract",
+        '🍀 Quest: "Somnia Testnet Odyssey - Socials"': "quest_socials",
         '🍀 Quest: "Somnia Testnet Odyssey - Sharing is Caring"': "quest_sharing",
         "🚪 Exit": "exit"
     }

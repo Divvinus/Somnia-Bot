@@ -19,7 +19,7 @@ async def apply_delay(min_delay: float | int, max_delay: float | int) -> None:
         await asyncio.sleep(delay)
 
 
-async def process_execution(account: Account, process_func: Callable) -> None:
+async def process_execution(account: Account, process_func: Callable) -> bool:
     address = get_address(account.private_key)
 
     async with semaphore:
@@ -35,10 +35,13 @@ async def process_execution(account: Account, process_func: Callable) -> None:
                     f"🔄 Accounts processed: {progress.processed}/"
                     f"{progress.total}"
                 )
+                return isinstance(status, tuple) and status[0] if isinstance(status, tuple) else bool(status)
 
         except Exception as e:
             log.error(f"Account: {address} | Error: {str(e)}")
-            
+    
+    return False
+
 
 class ModuleProcessor:    
     def __init__(self) -> None:
@@ -48,18 +51,23 @@ class ModuleProcessor:
             for name in Console.MODULES_DATA.values()
             if name != "exit"
         }
-
-    async def process_recruiting_referrals(self) -> None:
-        account = config.accounts[0]
-        await process_execution(account, self.module_functions[config.module])
-        log.info("🔄 Invitation for referrals is over")
-
+        
     async def process_regular_module(self) -> None:
         tasks = [
             process_execution(account, self.module_functions[config.module])
             for account in config.accounts
         ]
-        await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks)
+        
+        success_count = sum(1 for result in results if result)
+        failed_count = progress.total - success_count
+        
+        log.info(f"🌐 ==================================================")
+        log.info(f"🌐 📊 TOTAL STATISTICS")
+        log.info(f"🌐 ✅ Processed: {progress.processed}/{progress.total}")
+        log.info(f"🌐 ✅ Success: {success_count}/{progress.total}")
+        log.info(f"🌐 ❌ Failed: {failed_count}/{progress.total}")
+        log.info(f"🌐 ==================================================")
 
     async def execute(self) -> None:
         self.console.build()
@@ -76,11 +84,7 @@ class ModuleProcessor:
             return
 
         try:
-            if config.module == "recruiting_referrals":
-                await self.process_recruiting_referrals()
-            else:
-                await self.process_regular_module()
-                
+            await self.process_regular_module()                
         except Exception as e:
             address = get_address(config.accounts[0].private_key)
             log.error(f"Account: {address} | Error: {str(e)}")

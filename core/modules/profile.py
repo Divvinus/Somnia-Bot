@@ -12,8 +12,7 @@ from config.settings import (
     sleep_after_username_creation,
     sleep_after_discord_connection,
     sleep_after_twitter_connection,
-    sleep_after_telegram_connection,
-    # sleep_after_after_installing_photo_profile
+    sleep_after_telegram_connection
 )
 
 
@@ -201,9 +200,6 @@ class ProfileModule(SomniaClient):
         except Exception as e:
             log.error(f"Account {self.wallet_address} | Error: {e}")
             return False
-
-    # async def installing_photo_profile(self) -> bool:
-        # pass
         
     async def referral_bind(self) -> None:
         if not self.referral_code:
@@ -293,12 +289,6 @@ class ProfileModule(SomniaClient):
                 if not await self.connect_twitter_account():
                     return False
                 await random_sleep(self.wallet_address, **sleep_after_twitter_connection)
-                
-            # Setting up a profile picture
-            # if "imgUrl" in null_fields:
-            #     if not await self.installing_photo_profile():
-            #         return False
-            #     await random_sleep(self.wallet_address, **sleep_after_after_installing_photo_profile)                
 
             # Check if we need to activate referral
             referral_code = await self.get_me_info(get_referral_code=True)          
