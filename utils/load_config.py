@@ -51,6 +51,11 @@ class ConfigLoader:
                 self.data_client_path / 'auth_tokens_discord.txt',
                 required=False,
                 allow_empty=True
+            ),
+            'telegram_session': FileData(
+                self.data_client_path / 'telegram_session',
+                required=False,
+                allow_empty=True
             )
         }
 
@@ -137,6 +142,9 @@ class ConfigLoader:
                     self.file_paths['auth_tokens_discord']
                 ]
             )
+        
+        telegram_session_dir = self.file_paths['telegram_session'].path
+        telegram_session_exists = telegram_session_dir.exists() and telegram_session_dir.is_dir()
                 
         for index, private_key in enumerate(private_keys):
             try:            
@@ -151,6 +159,11 @@ class ConfigLoader:
                     auth_tokens_discord=(
                         auth_tokens_discord[index] 
                         if index < len(auth_tokens_discord) 
+                        else None
+                    ),
+                    telegram_session=(
+                        telegram_session_dir / private_key
+                        if telegram_session_exists
                         else None
                     )
                 )

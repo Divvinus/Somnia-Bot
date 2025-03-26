@@ -69,6 +69,12 @@ sleep_after_discord_connection = {"min_sec": 120, "max_sec": 180}
 """
 sleep_after_twitter_connection = {"min_sec": 180, "max_sec": 240}
 
+"""
+    en: Sleep after connecting a Telegram account
+    ru: Сон после подключения Telegram аккаунта
+"""
+sleep_after_telegram_connection = {"min_sec": 180, "max_sec": 240}
+
 # """
 #     en: Sleeping after installing a photo profile
 #     ru: Сон после установки фото профиля

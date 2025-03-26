@@ -18,6 +18,7 @@ class Account:
         'proxy',
         'auth_tokens_twitter',
         'auth_tokens_discord',
+        'telegram_session',
     )
 
     def __init__(
@@ -26,12 +27,13 @@ class Account:
         proxy: Proxy | None = None,
         auth_tokens_twitter: str | None = None,
         auth_tokens_discord: str | None = None,
+        telegram_session: Path | None = None
     ) -> None:
         self.private_key = private_key
         self.proxy = proxy
         self.auth_tokens_twitter = auth_tokens_twitter
         self.auth_tokens_discord = auth_tokens_discord
-
+        self.telegram_session = telegram_session
     def __repr__(self) -> str:
         return f'Account({self.private_key!r})'
 
@@ -70,6 +72,8 @@ class Config(BaseModel):
     somnia_explorer: str = ''
     referral_code: str = ''
     tokens: list[Token] = Field(default_factory=list)
+    telegram_api_id: str = ''
+    telegram_api_hash: str = ''
     delay_before_start: DelayRange
     threads: int
     module: str = ''

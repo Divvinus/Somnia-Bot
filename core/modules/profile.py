@@ -12,6 +12,7 @@ from config.settings import (
     sleep_after_username_creation,
     sleep_after_discord_connection,
     sleep_after_twitter_connection,
+    sleep_after_telegram_connection,
     # sleep_after_after_installing_photo_profile
 )
 
@@ -20,7 +21,7 @@ class ProfileModule(SomniaClient):
     def __init__(self, account: Account, referral_code: str | None = None):
         super().__init__(account)
         self.twitter_worker = TwitterClient(account)
-        # self.telegram_worker = TelegramClient(account)
+        self.telegram_worker = TelegramClient(account)
         self.account = account
         self.referral_code = referral_code            
         self._me_info_cache: Optional[Dict] = None
@@ -76,41 +77,49 @@ class ProfileModule(SomniaClient):
                 log.error(f"Account {self.wallet_address} | Error: {error}")
                 await asyncio.sleep(2)
 
-    # async def connect_telegram_account(self) -> bool:
-    #     log.info(f"Account {self.wallet_address} | Trying to link a Telegram account to a website...")
-    #     try:
-    #         code = await self.telegram_worker.run()
-    #         if not code:
-    #             return False
+    async def connect_telegram_account(self) -> bool:
+        log.info(f"Account {self.wallet_address} | Trying to link a Telegram account to a website...")
+        try:
+            code = await self.telegram_worker.run()
+            if not code:
+                log.error(f"Account {self.wallet_address} | No code received from Telegram worker")
+                return False
             
-    #         json_data = {
-    #             'encodedDetails': code,
-    #             'provider': 'telegram',
-    #         }
+            json_data = {
+                'encodedDetails': code,
+                'provider': 'telegram',
+            }
 
-    #         headers = {
-    #             **self._base_headers,
-    #             "accept": "*/*",
-    #             "referer": f"https://quest.somnia.network/telegram",
-    #         }
+            headers = {
+                **self._base_headers,
+                "accept": "*/*",
+                "referer": f"https://quest.somnia.network/telegram",
+            }
             
-    #         response = await self.send_request(
-    #             request_type="POST",
-    #             method="/auth/socials",
-    #             json_data=json_data,
-    #             headers=headers
-    #         )
+            response = await self.send_request(
+                request_type="POST",
+                method="/auth/socials",
+                json_data=json_data,
+                headers=headers,
+                verify=False
+            )
             
-    #         success = response.get('status_code') == 200 and response.get("success", False)
-    #         if success:
-    #             log.success(f"Account {self.wallet_address} | Telegram account connected successfully")
-    #             self._me_info_cache = None
-    #         else:
-    #             log.error(f"Account {self.wallet_address} | Failed to connect Telegram account")
-    #             log.error(f"Account {self.wallet_address} | Error: {response}")
-    #     except Exception as e:
-    #         log.error(f"Account {self.wallet_address} | Error: {e}")
-    #         return False
+            success = (
+                response.get('status_code') == 200 
+                and response.get('data', {}).get("success", False)
+            )
+            if success:
+                log.success(f"Account {self.wallet_address} | Telegram account connected successfully")
+                self._me_info_cache = None
+                return True
+            else:
+                log.error(f"Account {self.wallet_address} | Failed to connect Telegram account")
+                log.error(f"Account {self.wallet_address} | Error: {response}")
+                return False
+                    
+        except Exception as e:
+            log.error(f"Account {self.wallet_address} | Error: {e}")
+            return False
 
     async def connect_discord_account(self) -> bool:
         log.info(f"Account {self.wallet_address} | Trying to link a Discord account to a website...")
@@ -268,10 +277,10 @@ class ProfileModule(SomniaClient):
                 await random_sleep(self.wallet_address, **sleep_after_username_creation)
                 
             # Connect Telegram if session is available
-            # if "telegramName" in null_fields and self.account.telegram_session:
-            #     if not await self.connect_telegram_account():
-            #         return False
-            #     await random_sleep(self.wallet_address, **sleep_after_telegram_connection)
+            if "telegramName" in null_fields and self.account.telegram_session:
+                if not await self.connect_telegram_account():
+                    return False
+                await random_sleep(self.wallet_address, **sleep_after_telegram_connection)
 
             # Connect Discord if token is available
             if "discordName" in null_fields and self.account.auth_tokens_discord:

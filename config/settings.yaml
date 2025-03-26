@@ -38,6 +38,15 @@ tokens: &tokens
   - name: WBTC
     address: ""
 
+#------------------------------------------------------------------------------
+# en: Telegram API hash and ID | ru: Telegram API hash и ID
+#------------------------------------------------------------------------------
+
+# https://my.telegram.org/apps 
+
+telegram_api_id: ""
+telegram_api_hash: ""
+
 
 #------------------------------------------------------------------------------
 # en: MODULES CONFIGURATION  | ru: КОНФИГУРАЦИИ МОДУЛЕЙ
