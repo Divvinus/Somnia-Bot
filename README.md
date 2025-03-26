@@ -29,19 +29,20 @@ A multifunctional bot for automating interactions with the Somnia Network testne
   - Username creation and linking
   - Discord, Telegram, and Twitter connection
   - Account activation
-- Social quest completion
-  - Social media connection verification
-  - Referral task completion
-  - Two-stage social quests support
-- Token management
-  - Test token acquisition through faucet
-  - STT token transfers
-- Additional features
-  - Automatic referral acquisition
-  - Multi-threaded referral farming
+- Quest completion
+  - Somnia Testnet Odyssey - Social
+  - Somnia Testnet Odyssey - Sharing is Caring
+- Web3 modules
+  - Faucet
+  - Transfer STT
+  - Mint $Ping and $Pong
+  - Swap $Ping and $Pong
+  - Mint $sUSDT
+  - Send and mint message nft
+  - Deploy token contract
+- Additional modules
   - Account statistics monitoring
-  - Referral code saving and retrieval
-  - Private key file recording
+  - Saving referral codes
 
 ## 🌐 Supported Networks
 
@@ -105,31 +106,15 @@ discord_token2
 
 #### Telegram Sessions
 ```
-# Telegram sessions should be named after the private key
-# Place in config/data/telegram_sessions/
-# Example: 0x123abc...def.session
+ Telegram sessions should be named after the private key
+ Place in config/data/telegram_sessions/
+ Example: 0x123abc...def.session
 ```
 
 #### proxies.txt (optional)
 ```
 login:password@ip:port
 login:password@ip:port
-...
-```
-
-#### referral_codes.txt (for referral acquisition)
-```
-# Format: referral_code:number_of_referrals
-47DBF064:10
-B52ZX891:5
-...
-```
-
-#### generated_referrals.txt (for storing generated referrals)
-```
-# Format: private_key:referral_code
-0x123...abc:47DBF064
-0x456...def:B52ZX891
 ...
 ```
 
@@ -166,23 +151,47 @@ The following settings are available in `config/settings.py`:
 
 ### 6. settings.yaml Configuration
 
+Edit the `config/settings.yaml` file with the following settings:
+
 ```yaml
-# Number of threads
+#------------------------------------------------------------------------------
+# Threading Configuration
+#------------------------------------------------------------------------------
+# Controls parallel execution capacity (min: 1)
 threads: 10
 
-# Delay before start (seconds)
+#------------------------------------------------------------------------------
+# Timing Settings
+#------------------------------------------------------------------------------
+# Initial delay range before starting operations (seconds)
 delay_before_start:
     min: 1
     max: 100
 
-# API keys for captcha solving
-cap_monster: ""
-two_captcha: ""
-capsolver: ""
+#------------------------------------------------------------------------------
+# Telegram API hash and ID
+#------------------------------------------------------------------------------
+# Get these values from https://my.telegram.org/apps 
+telegram_api_id: "YOUR_API_ID"
+telegram_api_hash: "YOUR_API_HASH"
 
-# Referral code for registration
-referral_code: "YOUR_CODE"
+#------------------------------------------------------------------------------
+# MODULES CONFIGURATION
+#------------------------------------------------------------------------------
+# Referral code for standard account registration
+referral_code: "YOUR_REFERRAL_CODE"
+
+#------------------------------------------------------------------------------
+# Network Settings
+#------------------------------------------------------------------------------
+# Somnia Testnet RPC endpoint
+somnia_rpc: https://dream-rpc.somnia.network
+
+# Somnia Testnet Explorer
+somnia_explorer: https://shannon-explorer.somnia.network/
 ```
+
+Note: For Telegram functionality, you must obtain `api_id` and `api_hash` values from the [Telegram API Development Tools](https://my.telegram.org/apps).
 
 ## 🚀 Launch
 
@@ -193,27 +202,33 @@ python run.py
 ## 📚 Available Commands
 
 After launching the bot, the following options are available:
-1. 🔑 Get Referral Code - Get referral code for the account
-2. 🏆 Account Statistics - View detailed account metrics and progress
-3. 🤖 Recruiting Referrals - Automate referral acquisition process
-4. 👤 Profile - Set up profile and connect social accounts
-5. 💰 Faucet - Claim test tokens from Somnia faucet
-6. 💸 Transfer STT - Transfer STT tokens between wallets
-7. 👥 Social Quests 1 - Complete initial social media tasks and earn rewards
-8. 🌐 Social Quests 2 - Complete advanced social media tasks and earn rewards
-9. 🚪 Exit - Exit the application
+1. 👤 Profile - Set up your profile and connect social accounts
+2. 🏆 Account statistics - View detailed account metrics and progress
+3. 🔑 Get referral code - Obtain your account's referral code
+4. 💰 Faucet - Claim test tokens from Somnia faucet
+5. 💸 Transfer STT - Transfer STT tokens between wallets
+6. 🏓 Mint $Ping and $Pong - Create Ping and Pong tokens
+7. 💱 Swap $Ping and $Pong - Exchange Ping and Pong tokens
+8. 🚰 Mint $sUSDT - Mint test USDT tokens
+9. 💬 Send and mint message NFT - Create NFTs with messages
+10. 🏗 Deploy token contract - Deploy your own token contract
+11. 🍀 Quest: "Somnia Testnet Odyssey - Socials" - Complete social media tasks
+12. 🍀 Quest: "Somnia Testnet Odyssey - Sharing is Caring" - Complete token sharing tasks
+13. 🚪 Exit - Exit the application
 
 ## 🌟 Social Quests
 
-### Social Quests 1
-- Basic social media connection tasks
-- Referral registration
-- Initial platform interactions
+### Quest: "Somnia Testnet Odyssey - Socials"
+- Connect Telegram account
+- Set up username in the system
+- Connect Discord account
+- Follow on Twitter
+- Connect Twitter account
 
-### Social Quests 2
-- Confirming Telegram tethering and setting user name
-- Following specific accounts
-- Retweet a tweet
+### Quest: "Somnia Testnet Odyssey - Sharing is Caring"
+- Receive STT tokens via transactions
+- Send STT tokens to other users
+- Request tokens from the faucet
 
 ## 🔒 Security Recommendations
 
