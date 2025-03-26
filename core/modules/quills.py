@@ -7,7 +7,7 @@ from logger import log
 from core.api import BaseAPIClient
 from core.wallet import Wallet
 from models import Account, ERC20Contract
-from utils import show_trx_log, ContractGeneratorData
+from utils import show_trx_log, ContractGeneratorData, random_sleep
 
 
 def _get_headers() -> dict[str, str]:
@@ -82,15 +82,31 @@ class QuillsMessageModule:
             'message': message,
         }
         
-        response = await self.api.send_request(
-            request_type="POST",
-            method="/mint-nft",
-            json_data=json_data,
-            headers=_get_headers(),
-            verify=False
-        )
+        max_attempts = 3
+        for attempt in range(1, max_attempts + 1):
+            try:
+                log.info(f"Account {self.wallet_address} | Attempt to mint a message {attempt}/{max_attempts}")
+                
+                response = await self.api.send_request(
+                    request_type="POST",
+                    method="/mint-nft",
+                    json_data=json_data,
+                    headers=_get_headers(),
+                    verify=False
+                )
+                
+                if response and await self._process_api_response(response, f"minted an nft message: {message}"):
+                    return True
+                    
+                if attempt < max_attempts:
+                    await random_sleep(self.wallet_address)
+            except Exception as e:
+                log.error(f"Account {self.wallet_address} | Error during minting a message (attempt {attempt}): {str(e)}")
+                if attempt < max_attempts:
+                    time.sleep(2 * attempt)
         
-        return await self._process_api_response(response, f"minted an nft message: {message}")
+        log.error(f"Account {self.wallet_address} | All attempts to mint a message have been exhausted")
+        return False
     
     async def run(self) -> bool:
         log.info(

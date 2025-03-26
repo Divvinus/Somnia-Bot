@@ -55,23 +55,11 @@ class DelayRange(BaseModel):
     )
 
 
-class Token(BaseModel):
-    __slots__ = ('name', 'address')
-    name: str
-    address: str
-
-    model_config = ConfigDict(
-        frozen=True,
-        extra='forbid',
-    )
-
-
 class Config(BaseModel):
     accounts: list[Account] = Field(default_factory=list)
     somnia_rpc: str = ''
     somnia_explorer: str = ''
     referral_code: str = ''
-    tokens: list[Token] = Field(default_factory=list)
     telegram_api_id: str = ''
     telegram_api_hash: str = ''
     delay_before_start: DelayRange
