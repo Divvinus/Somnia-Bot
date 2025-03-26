@@ -95,7 +95,9 @@ class BaseQuestModule(SomniaClient, ABC):
 
     async def run(self) -> tuple[bool, str]:
         try:
-            quest_name = self.__class__.__name__.replace("QuestModule", "")
+            class_name = self.__class__.__name__
+            quest_name = class_name.replace("Module", "").replace("Quest", "")
+            
             log.info(f'Account {self.wallet_address} | Starting quest: "Somnia Testnet Odyssey - {quest_name}" processing...')
             
             excluded_quests = set()
