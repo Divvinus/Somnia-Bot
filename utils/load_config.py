@@ -29,7 +29,8 @@ class FileData:
 class ConfigLoader:
     REQUIRED_PARAMS: set[str] = frozenset({
         'referral_code',
-        'threads'
+        'threads',
+        'tokens'
     })
 
     def __init__(self, base_path: str | Path | None = None) -> None:
@@ -105,6 +106,12 @@ class ConfigLoader:
                     f'Missing required fields: {", ".join(missing_fields)}'
                 )
 
+            if 'always_run_tasks' not in config:
+                config['always_run_tasks'] = {
+                    'by_id': [],
+                    'by_module': []
+                }
+
             return config
 
         except Exception as error:
@@ -148,6 +155,10 @@ class ConfigLoader:
                 
         for index, private_key in enumerate(private_keys):
             try:            
+                session_path = telegram_session_dir / private_key if telegram_session_exists else None
+                if session_path and not session_path.exists():
+                    session_path = None
+                
                 yield Account(
                     private_key=private_key,
                     proxy=next(proxy_cycle) if proxy_cycle else None,
@@ -161,11 +172,7 @@ class ConfigLoader:
                         if index < len(auth_tokens_discord) 
                         else None
                     ),
-                    telegram_session=(
-                        telegram_session_dir / private_key
-                        if telegram_session_exists
-                        else None
-                    )
+                    telegram_session=session_path
                 )
             except Exception as error:
                 log.error(

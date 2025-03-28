@@ -30,6 +30,9 @@ class Console:
         "🏗  Deploy token contract",
         '🍀 Quest: "Somnia Testnet Odyssey - Socials"',
         '🍀 Quest: "Somnia Testnet Odyssey - Sharing is Caring"',
+        "🔄 Сгенерировать маршруты",
+        "📊 Просмотр статистики маршрутов",
+        "▶️ Выполнить маршрут",
         "🚪 Exit",
     )
     
@@ -46,6 +49,9 @@ class Console:
         "🏗  Deploy token contract": "deploy_token_contract",
         '🍀 Quest: "Somnia Testnet Odyssey - Socials"': "quest_socials",
         '🍀 Quest: "Somnia Testnet Odyssey - Sharing is Caring"': "quest_sharing",
+        "🔄 Сгенерировать маршруты": "generate_routes",
+        "📊 Просмотр статистики маршрутов": "view_routes",
+        "▶️ Выполнить маршрут": "execute_route",
         "🚪 Exit": "exit"
     }
 
@@ -116,6 +122,3 @@ class Console:
 
         module = self.get_module()
         config.module = self.MODULES_DATA[module]
-
-        if config.module == "exit":
-            exit(0)
