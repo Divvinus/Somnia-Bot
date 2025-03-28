@@ -295,8 +295,6 @@ class ProfileModule(SomniaClient):
             if referral_code is None:
                 await self.activate_referral()
 
-            # Get final stats
-            await self.get_stats()
             log.success(f"Account {self.wallet_address} | Profile setup completed successfully")
             return True
 
