@@ -125,7 +125,7 @@ class SmapPingPongModule(Wallet):
         balance = await self.token_balance(contract_model.address)
 
         if balance <= 0 or balance is None:
-            log.success(
+            log.warning(
                 f'Account {self.wallet_address} | '
                 f'You do not have the tokens for the "{token_name}" swap'
             )
