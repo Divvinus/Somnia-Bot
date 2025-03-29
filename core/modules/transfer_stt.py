@@ -24,30 +24,29 @@ class TransferSTTModule(Wallet):
         private_key = keys.PrivateKey(secrets.token_bytes(32))
         return to_checksum_address(private_key.public_key.to_address())
 
-    def _calculate_transfer_amount(self, balance: float) -> float | None:
+    def _calculate_transfer_amount(self, balance: float) -> tuple[bool, float | str]:
         if balance > 0.01:
-            return random.choice([0.01, 0.005, 0.001])
+            return True, random.choice([0.01, 0.005, 0.001])
         if balance > 0.005:
-            return random.choice([0.005, 0.001])
+            return True, random.choice([0.005, 0.001])
         if balance > 0.001:
-            return 0.001
-        return None
+            return True, 0.001
+        return False, "Not enough balance"
 
     async def transfer_stt(self) -> tuple[bool, str]:
         log.info(f"Account {self.wallet_address} | Processing transfer_stt...")
 
         try:
             balance = await self.human_balance()
-            amount = self._calculate_transfer_amount(balance)
+            status, amount = self._calculate_transfer_amount(balance)
+            if not status:
+                error_msg = f"Account {self.wallet_address} | {amount}"
+                return status, amount
+
             to_address = (
                 self.wallet_address if self.me 
                 else self.generate_eth_address()
             )
-
-            if not amount:
-                error_msg = f"Account {self.wallet_address} | Not enough balance"
-                log.error(error_msg)
-                return False, error_msg
 
             transaction = {
                 "from": self.wallet_address,
@@ -72,6 +71,6 @@ class TransferSTTModule(Wallet):
             return (True, tx_hash) if status else (False, f"Transaction failed: {tx_hash}")
 
         except Exception as error:
-            error_msg = f"Error in transfer_stt: {error!s}"
+            error_msg = f"Error in transfer_stt: {str(error)}"
             log.error(f"Account {self.wallet_address} | {error_msg}")
             return False, error_msg

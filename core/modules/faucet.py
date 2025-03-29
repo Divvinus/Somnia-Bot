@@ -67,7 +67,7 @@ class FaucetModule(Wallet, BaseAPIClient):
                 self.wallet_address,
                 **sleep_between_repeated_token_requests
             )
-            return False
+            return False, "First register account with Somnia project"
 
         data = response.get("data", {})
         error_message = data.get("error")
@@ -81,7 +81,7 @@ class FaucetModule(Wallet, BaseAPIClient):
                 f"Account {self.wallet_address} | "
                 "Tokens already received today"
             )
-            return True
+            return False, "Tokens already received today"
 
         if details in {
             "An error occurred while processing the faucet request. Please try again later.",
@@ -95,7 +95,7 @@ class FaucetModule(Wallet, BaseAPIClient):
                 self.wallet_address,
                 **sleep_between_repeated_token_requests
             )
-            return False
+            return False, "Faucet request error. Retrying..."
 
         if error_message:
             log.error(
@@ -106,13 +106,13 @@ class FaucetModule(Wallet, BaseAPIClient):
                 self.wallet_address,
                 **sleep_between_repeated_token_requests
             )
-            return False
+            return False, "Unexpected error"
 
         log.success(
             f"Account {self.wallet_address} | "
             "Successfully requested test tokens"
         )
-        return True
+        return True, "Successfully requested test tokens"
     
     async def _save_bad_private_key(self) -> None:
         file_path = os.path.join("config", "data", "client", "bad_private_key.txt")
@@ -126,7 +126,7 @@ class FaucetModule(Wallet, BaseAPIClient):
             except Exception as e:
                 log.error(f"Account {self.wallet_address} | Error saving private key: {str(e)}")
     
-    async def run(self) -> bool:
+    async def run(self) -> tuple[bool, str]:
         log.info(f"Account {self.wallet_address} | Processing faucet...")
 
         headers = self._get_headers()
@@ -150,11 +150,11 @@ class FaucetModule(Wallet, BaseAPIClient):
                         "Address suspected to be a bot"
                     )
                     asyncio.create_task(self._save_bad_private_key())
-                    return False
+                    return False, "Address suspected to be a bot"
 
-                if await self._handle_response(response):
-                    return True
+                return await self._handle_response(response)
+                
         except Exception as e:
             log.error(f"Account {self.wallet_address} | Critical error: {str(e)}")
-            return False
-        return False
+            return False, str(e)
+        return False, "Unknown cause of error" 

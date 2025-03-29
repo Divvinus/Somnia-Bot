@@ -122,7 +122,7 @@ class SomniaClient:
             
         return headers
 
-    async def onboarding(self) -> bool:
+    async def onboarding(self) -> tuple[bool, str]:
         """Onboarding process"""
         try:
             for attempt in range(self.config.MAX_RETRIES):
@@ -148,17 +148,16 @@ class SomniaClient:
                 token = response.get("data").get("token")
                 if not token:
                     log.error(f"Account {self.wallet_address} | No token in response")
-                    return False
+                    return False, "No token in response 'onboarding'"
                     
                 self._authorization_token = token
-                return True
+                return True, "Successfully onboarded"
                 
         except Exception as e:
             log.error(f"Account {self.wallet_address} | Onboarding error: {e}")
-            return False
+            return False, str(e)
 
     async def get_stats(self) -> Optional[StatsResponse]:
-        """Getting account statistics"""
         try:
             response = await self.send_request(
                 request_type="GET",
@@ -178,7 +177,7 @@ class SomniaClient:
             log.error(f"Account {self.wallet_address} | Failed to get stats: {e}")
             return None
 
-    async def get_me_info(self, get_referral_code: bool = False) -> Optional[Union[str, Dict[str, None]]]:
+    async def get_me_info(self, get_referral_code: bool = False) -> tuple[bool, str | dict[str, None]]:
         try:
             if self._me_info_cache is None:
                 response = await self.send_request(
@@ -190,11 +189,11 @@ class SomniaClient:
                 
                 if response.get("status_code") != 200:
                     log.error(f"Account {self.wallet_address} | Server error: {response.get('status_code')}")
-                    return None
+                    return False, "Server error"
                     
                 if response.get("data") is None:
                     log.error(f"Account {self.wallet_address} | No data in response")
-                    return None
+                    return False, "No data in response"
 
                 self._me_info_cache = response.get("data")
 
@@ -207,10 +206,10 @@ class SomniaClient:
             }
 
         except Exception as e:
-            log.error(f"Account {self.wallet_address} | Failed to get user info: {e}")
-            return None
+            log.error(f"Account {self.wallet_address} | Failed to get user info: {str(e)}")
+            return False, str(e)
 
-    async def activate_referral(self) -> bool:
+    async def activate_referral(self) -> tuple[bool, str]:
         """Activation of referral code"""
         log.info(f"Account {self.wallet_address} | Activating account")
         
@@ -224,7 +223,7 @@ class SomniaClient:
                 )
                 if response.get("status_code") == 200:
                     log.success(f"Account {self.wallet_address} | Account activated")
-                    return True
+                    return True, "Successfully activated referral code"
                     
                 if response.get("status_code") == 500:
                     log.warning(
@@ -242,17 +241,17 @@ class SomniaClient:
                     f"Account {self.wallet_address} | "
                     f"Activation failed: {response}"
                 )
-                return False
+                return False, "Activation failed"
                 
             except Exception as e:
-                log.error(f"Account {self.wallet_address} | Activation error: {e}")
-                return False
+                log.error(f"Account {self.wallet_address} | Activation error: {str(e)}")
+                return False, str(e)
                 
         log.warning(
             f"Account {self.wallet_address} | "
             f"Failed after {self.config.MAX_RETRIES} attempts"
         )
-        return False
+        return False, "Activation failed"
     
     async def get_referral_code(self) -> Optional[str]:
         """Getting referral code and saving to file"""

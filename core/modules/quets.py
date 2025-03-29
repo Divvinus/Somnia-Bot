@@ -71,7 +71,7 @@ class BaseQuestModule(SomniaClient, ABC):
         response_data = response.get("data", {})
         if response_data.get("success"):
             log.success(f"Account {self.wallet_address} | {success_msg}")
-            return True, None
+            return True, success_msg
 
         error_reason = response_data.get("reason", "")
         log_msg = f"Account {self.wallet_address} | {error_msg} | Reason: {error_reason}"

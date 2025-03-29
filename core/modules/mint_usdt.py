@@ -9,7 +9,7 @@ class MintUsdtModule(Wallet):
     def __init__(self, account: Account, rpc_url: str) -> None:
         super().__init__(account.private_key, rpc_url, account.proxy)
 
-    async def mint_usdt(self) -> tuple[bool, str] | bool:
+    async def mint_usdt(self) -> tuple[bool, str]:
         log.info(f"Account {self.wallet_address} | Processing mint 1000 $sUSDT...")
 
         try:
@@ -19,7 +19,7 @@ class MintUsdtModule(Wallet):
             if balance > 0:
                 msg = f"Account {self.wallet_address} | Mint 1000 $sUSDT had been done before"
                 log.success(msg)
-                return (True, "before")
+                return True, "before"
 
             mint_function = contract.functions.mint()
             tx_params = {
@@ -43,15 +43,10 @@ class MintUsdtModule(Wallet):
         except Exception as error:
             error_msg = f"Account {self.wallet_address} | Error mint 1000 $sUSDT: {error!s}"
             log.error(error_msg)
-            return False
+            return False, str(error)
 
-    async def run(self) -> bool:
-        mint_result = await self.mint_usdt()
-
-        if isinstance(mint_result, bool):
-            return mint_result
-
-        status, result = mint_result
+    async def run(self) -> tuple[bool, str]:
+        status, result = await self.mint_usdt()
 
         if "ACCOUNT_DOES_NOT_EXIST" in result:
             warning_msg = (
@@ -59,7 +54,7 @@ class MintUsdtModule(Wallet):
                 "First register an account with the Somnia project, then come back"
             )
             log.warning(warning_msg)
-            return False
+            return status, "First register an account with the Somnia project, then come back"
 
         if result != "before":
             show_trx_log(
@@ -69,6 +64,6 @@ class MintUsdtModule(Wallet):
                 result,
                 config.somnia_explorer
             )
-            return True
+            return status, "Successfully minted 1000 $sUSDT"
 
-        return True
+        return status, result

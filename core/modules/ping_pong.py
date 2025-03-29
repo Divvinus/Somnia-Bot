@@ -82,7 +82,7 @@ class MintPingPongModule(Wallet):
                     f"Account {self.wallet_address} | First register an account "
                     "with the Somnia project, then come back and mint NFTs"
                 )
-                return False
+                return status, result
 
             if result != "already_minted":
                 show_trx_log(
@@ -103,7 +103,9 @@ class MintPingPongModule(Wallet):
             else:
                 log.warning(f"Account {self.wallet_address} | Failed to mint {token_name}")
 
-        return success_count == len(contracts)
+        if success_count == len(contracts):
+            return True, "Successfully minted tokens"
+        return False, "Unknown cause of error"
 
 
 class SmapPingPongModule(Wallet):
@@ -223,6 +225,7 @@ class SmapPingPongModule(Wallet):
 
         for i, (token_in_contract, token_in_name) in enumerate(contracts):
             token_out_contract, token_out_name = contracts[(i + 1) % len(contracts)]
+            
             status, result = await self._swap_tokens(
                 token_in_contract,
                 token_in_name,
@@ -235,7 +238,7 @@ class SmapPingPongModule(Wallet):
                     f"Account {self.wallet_address} | "
                     "First register an account with the Somnia project"
                 )
-                return False
+                return status, result
 
             if status:
                 show_trx_log(
@@ -259,4 +262,6 @@ class SmapPingPongModule(Wallet):
                     f"Failed swap {token_in_name}. Error: {result}"
                 )
 
-        return success_count == len(contracts)
+        if success_count == len(contracts):
+            return True, "Successfully swapped tokens"
+        return False, "Unknown cause of error"

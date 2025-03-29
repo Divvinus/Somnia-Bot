@@ -42,15 +42,15 @@ class QuillsMessageModule:
             await self.api._safely_close_session(self.api.session)
             self.api.session = None
         
-    async def _process_api_response(self, response: dict, operation_name: str) -> bool:
+    async def _process_api_response(self, response: dict, operation_name: str) -> tuple[bool, str]:
         if response.get("data", {}).get("success"):
             log.success(f"Account {self.wallet_address} | Successfully {operation_name}")
-            return True
+            return True, "Successfully completed operation"
         else:
             log.error(f"Account {self.wallet_address} | Unknown error during {operation_name}. Response: {response}")
-            return False
+            return False, "Unknown error"
     
-    async def auth(self) -> bool:
+    async def auth(self) -> tuple[bool, str]:
         log.info(f"Account {self.wallet_address} | Beginning the authorization process on the site quills.fun...")
         
         message = f"I accept the Quills Adventure Terms of Service at https://quills.fun/terms\n\nNonce: {int(time.time() * 1000)}"
@@ -72,7 +72,7 @@ class QuillsMessageModule:
         
         return await self._process_api_response(response, "logged into the site quills.fun")
     
-    async def mint_message_nft(self) -> bool:
+    async def mint_message_nft(self) -> tuple[bool, str]:
         log.info(f"Account {self.wallet_address} | Beginning the process of sending a message...")
         
         message = self.fake.word()
@@ -96,7 +96,7 @@ class QuillsMessageModule:
                 )
                 
                 if response and await self._process_api_response(response, f"minted an nft message: {message}"):
-                    return True
+                    return True, "Successfully minted an nft message"
                     
                 if attempt < max_attempts:
                     await random_sleep(self.wallet_address)
@@ -106,20 +106,20 @@ class QuillsMessageModule:
                     time.sleep(2 * attempt)
         
         log.error(f"Account {self.wallet_address} | All attempts to mint a message have been exhausted")
-        return False
+        return False, "Failed to mint an nft message"
     
-    async def run(self) -> bool:
+    async def run(self) -> tuple[bool, str]:
         log.info(
             f"Account {self.wallet_address} | I perform tasks on sending and minting nft message on the site quills.fun..."
         )
         
         if not await self.auth():
-            return False
+            return False, "Failed to authorize on the site quills.fun"
         
         if not await self.mint_message_nft():
-            return False
+            return False, "Failed to mint an nft message"
         
-        return True
+        return True, "Successfully completed all tasks"
     
 
 class QuillsDeployContractModule(Wallet):
@@ -187,11 +187,11 @@ class QuillsDeployContractModule(Wallet):
                 result=result,
                 explorer_url=self.explorer_url
             )
-            return status
+            return status, result
             
         except (ValueError, ConnectionError) as e:
             log.error(f"Account {self.wallet_address} | Error during contract deployment: {str(e)}")
-            return False
+            return False, str(e)
         except Exception as e:
             log.error(f"Account {self.wallet_address} | Unexpected error: {str(e)}")
-            return False
+            return False, str(e)

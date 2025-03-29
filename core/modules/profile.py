@@ -44,14 +44,14 @@ class ProfileModule(SomniaClient):
             "sec-fetch-site": "same-origin",
         }
 
-    async def create_username(self) -> bool:
+    async def create_username(self) -> tuple[bool, str]:
         log.info(f"Account {self.wallet_address} | Trying to set the username...")
         headers = {
             **self._base_headers,
             "referer": "https://quest.somnia.network/account",
         }
 
-        while True:
+        for _ in range(3):
             try:
                 username = generate_username()
                 response = await self.send_request(
@@ -65,24 +65,26 @@ class ProfileModule(SomniaClient):
                 if response.get('status_code') in [200, 201, 204]:
                     log.info(f"Account {self.wallet_address} | Created username {username}")
                     self._me_info_cache = None
-                    return True
+                    return True, "Successfully created username"
 
                 log.warning(
                     f"Account {self.wallet_address} | Failed to create username {username}. Status: {response.get('status_code')}. Let's try again..."
                 )
-                await asyncio.sleep(2)
+                await random_sleep(self.wallet_address, **sleep_after_username_creation)
 
             except Exception as error:
-                log.error(f"Account {self.wallet_address} | Error: {error}")
-                await asyncio.sleep(2)
+                log.error(f"Account {self.wallet_address} | Error: {str(error)}")
+                return False, str(error)
+            
+        return False, "Failed to create username even with three attempts"
 
-    async def connect_telegram_account(self) -> bool:
+    async def connect_telegram_account(self) -> tuple[bool, str]:
         log.info(f"Account {self.wallet_address} | Trying to link a Telegram account to a website...")
         try:
             code = await self.telegram_worker.run()
             if not code:
                 log.error(f"Account {self.wallet_address} | No code received from Telegram worker")
-                return False
+                return False, "No code received from Telegram worker"
             
             json_data = {
                 'encodedDetails': code,
@@ -110,22 +112,22 @@ class ProfileModule(SomniaClient):
             if success:
                 log.success(f"Account {self.wallet_address} | Telegram account connected successfully")
                 self._me_info_cache = None
-                return True
+                return True, "Successfully connected Telegram account"
             else:
                 log.error(f"Account {self.wallet_address} | Failed to connect Telegram account")
                 log.error(f"Account {self.wallet_address} | Error: {response}")
-                return False
+                return False, "Failed to connect Telegram account"
                     
         except Exception as e:
-            log.error(f"Account {self.wallet_address} | Error: {e}")
-            return False
+            log.error(f"Account {self.wallet_address} | Error: {str(e)}")
+            return False, str(e)
 
-    async def connect_discord_account(self) -> bool:
+    async def connect_discord_account(self) -> tuple[bool, str]:
         log.info(f"Account {self.wallet_address} | Trying to link a Discord account to a website...")
         try:
             code = await self.discord_worker._request_authorization()
             if not code:
-                return False
+                return False, "No code received from Discord worker"
 
             headers = {
                 **self._base_headers,
@@ -151,18 +153,18 @@ class ProfileModule(SomniaClient):
                 log.error(f"Account {self.wallet_address} | Failed to connect Discord account")
                 log.error(f"Account {self.wallet_address} | Error: {response}")
 
-            return success
+            return success, "Successfully connected Discord account"
 
         except Exception as e:
-            log.error(f"Account {self.wallet_address} | Error: {e}")
-            return False
+            log.error(f"Account {self.wallet_address} | Error: {str(e)}")
+            return False, str(e)
 
-    async def connect_twitter_account(self) -> bool:
+    async def connect_twitter_account(self) -> tuple[bool, str]:
         log.info(f"Account {self.wallet_address} | Trying to connect Twitter account...")
         try:
             code = await self.twitter_worker.connect_twitter()
             if not code:
-                return False
+                return False, "No code received from Twitter worker"
 
             headers = {
                 **self._base_headers,
@@ -195,16 +197,16 @@ class ProfileModule(SomniaClient):
                 log.error(f"Account {self.wallet_address} | Failed to connect Twitter account")
                 log.error(f"Account {self.wallet_address} | Error: {response}")
 
-            return success
+            return success, "Successfully connected Twitter account"
 
         except Exception as e:
-            log.error(f"Account {self.wallet_address} | Error: {e}")
-            return False
+            log.error(f"Account {self.wallet_address} | Error: {str(e)}")
+            return False, str(e)
         
-    async def referral_bind(self) -> None:
+    async def referral_bind(self) -> tuple[bool, str]:
         if not self.referral_code:
             log.warning(f"Account {self.wallet_address} | Referral code not found")
-            return
+            return False, "Referral code not found"
 
         try:
             payload = {"referralCode": self.referral_code, "product": "QUEST_PLATFORM"}
@@ -229,75 +231,92 @@ class ProfileModule(SomniaClient):
             
             if response.get('status_code') == 200:
                 log.success(f"Account {self.wallet_address} | Referral code bound to the account")
+                return True, "Successfully bound referral code"
+            else:
+                log.error(f"Account {self.wallet_address} | Failed to bind referral code")
+                log.error(f"Account {self.wallet_address} | Error: {response}")
+                return False, "Failed to bind referral code"
 
         except Exception as e:
-            log.error(f"Account {self.wallet_address} | Error binding referral: {e}")
+            log.error(f"Account {self.wallet_address} | Error binding referral: {str(e)}")
+            return False, str(e)
 
-    async def get_account_statistics(self) -> bool:
+    async def get_account_statistics(self) -> tuple[bool, str]:
         log.info(f"Account {self.wallet_address} | Getting account statistics...")
         try:
-            if not await self.onboarding():
+            status, result = await self.onboarding()
+            if not status:
                 log.error(f"Account {self.wallet_address} | Failed to authorize on Somnia")
-                return False
+                return status, result
             await self.get_stats()
-            return True
+            return True, "Successfully got account statistics"
         except Exception as e:
-            log.error(f"Account {self.wallet_address} | Error getting statistics: {e}")
-            return False
+            log.error(f"Account {self.wallet_address} | Error getting statistics: {str(e)}")
+            return False, str(e)
 
-    async def run(self) -> bool:
+    async def run(self) -> tuple[bool, str]:
         log.info(f"Account {self.wallet_address} | Starting the profile module...")
+        error_messages = []
         try:
-            # First step - authorization
             log.info(f"Account {self.wallet_address} | Starting the onboarding process...")
-            if not await self.onboarding():
+            status, result = await self.onboarding()
+            if not status:
                 log.error(f"Account {self.wallet_address} | Failed to authorize on Somnia")
-                return False
-            
-            # Handle referral
+                return False, result
+
             log.info(f"Account {self.wallet_address} | Binding the referral code...")
             if self.referral_code:
-                await self.referral_bind()            
+                await self.referral_bind()
                 await random_sleep(self.wallet_address, **sleep_after_referral_bind)
-            
-            # Get current user info
+
             log.info(f"Account {self.wallet_address} | Getting the current user info...")
             null_fields = await self.get_me_info()
             if null_fields is None:
                 log.success(f"Account {self.wallet_address} | Profile setup completed successfully")
-                return True
-                         
+                return True, "Successfully got the current user info"
+
             if "username" in null_fields:
-                if not await self.create_username():
-                    return False
-                await random_sleep(self.wallet_address, **sleep_after_username_creation)
-                
-            # Connect Telegram if session is available
+                status, result = await self.create_username()
+                if not status:
+                    error_messages.append(result)
+                else:
+                    await random_sleep(self.wallet_address, **sleep_after_username_creation)
+
             if "telegramName" in null_fields and self.account.telegram_session:
-                if not await self.connect_telegram_account():
-                    return False
-                await random_sleep(self.wallet_address, **sleep_after_telegram_connection)
+                status, result = await self.connect_telegram_account()
+                if not status:
+                    error_messages.append(result)
+                else:
+                    await random_sleep(self.wallet_address, **sleep_after_telegram_connection)
 
-            # Connect Discord if token is available
             if "discordName" in null_fields and self.account.auth_tokens_discord:
-                if not await self.connect_discord_account():
-                    return False
-                await random_sleep(self.wallet_address, **sleep_after_discord_connection)
+                status, result = await self.connect_discord_account()
+                if not status:
+                    error_messages.append(result)
+                else:
+                    await random_sleep(self.wallet_address, **sleep_after_discord_connection)
 
-            # # Connect Twitter if token is available
             if "twitterName" in null_fields and self.account.auth_tokens_twitter:
-                if not await self.connect_twitter_account():
-                    return False
-                await random_sleep(self.wallet_address, **sleep_after_twitter_connection)
+                status, result = await self.connect_twitter_account()
+                if not status:
+                    error_messages.append(result)
+                else:
+                    await random_sleep(self.wallet_address, **sleep_after_twitter_connection)
 
-            # Check if we need to activate referral
-            referral_code = await self.get_me_info(get_referral_code=True)          
+            referral_code = await self.get_me_info(get_referral_code=True)
             if referral_code is None:
-                await self.activate_referral()
+                status, result = await self.activate_referral()
+                if not status:
+                    error_messages.append(result)
 
-            log.success(f"Account {self.wallet_address} | Profile setup completed successfully")
-            return True
+            if error_messages:
+                combined_error = "; ".join(error_messages)
+                log.error(f"Account {self.wallet_address} | Profile setup completed with errors: {combined_error}")
+                return False, combined_error
+            else:
+                log.success(f"Account {self.wallet_address} | Profile setup completed successfully")
+                return True, "Successfully setup profile"
 
         except Exception as e:
-            log.error(f"Account {self.wallet_address} | Error in run method: {e}")
-            return False
+            log.error(f"Account {self.wallet_address} | Error in run method: {str(e)}")
+            return False, str(e)
