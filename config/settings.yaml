@@ -13,6 +13,11 @@ delay_before_start:
     min: 0
     max: 0
 
+# en: Delay between tasks (seconds) | ru: Задержка между задачами (секунды)
+delay_between_tasks:
+    min: 30
+    max: 120
+
 
 #------------------------------------------------------------------------------
 # en: Telegram API hash and ID | ru: Telegram API hash и ID

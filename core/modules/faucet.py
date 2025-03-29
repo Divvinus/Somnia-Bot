@@ -81,7 +81,7 @@ class FaucetModule(Wallet, BaseAPIClient):
                 f"Account {self.wallet_address} | "
                 "Tokens already received today"
             )
-            return False, "Tokens already received today"
+            return True, "Tokens already received today"
 
         if details in {
             "An error occurred while processing the faucet request. Please try again later.",

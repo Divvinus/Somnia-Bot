@@ -78,6 +78,7 @@ class Config(BaseModel):
     accounts: list[Account] = Field(default_factory=list)
     threads: int
     delay_before_start: DelayRange
+    delay_between_tasks: DelayRange
     referral_code: str
     telegram_api_id: str = ""
     telegram_api_hash: str = ""

@@ -62,7 +62,7 @@ class TaskUpdateModel(BaseModel):
     error: str | None = None
 
 class RouteStats(BaseModel):
-    id: int
+    id: str
     route_name: str
     private_key: str
     status: str
@@ -193,23 +193,25 @@ class Database:
     async def init_db(cls) -> None:
         conn = await cls._get_connection()
         try:
+            # Создаем все таблицы с новой структурой
             await conn.executescript("""
                 CREATE TABLE IF NOT EXISTS accounts (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     private_key TEXT UNIQUE NOT NULL,
                     address TEXT
                 );
+                
                 CREATE TABLE IF NOT EXISTS routes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id TEXT PRIMARY KEY,
                     account_id INTEGER,
                     route_name TEXT,
                     status TEXT DEFAULT 'pending',
-                    UNIQUE(account_id, route_name),
                     FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
                 );
+                
                 CREATE TABLE IF NOT EXISTS tasks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    route_id INTEGER,
+                    route_id TEXT,
                     module_name TEXT NOT NULL,
                     order_num INTEGER NOT NULL,
                     status TEXT DEFAULT 'pending',
@@ -219,6 +221,7 @@ class Database:
                     UNIQUE(route_id, module_name),
                     FOREIGN KEY (route_id) REFERENCES routes(id) ON DELETE CASCADE
                 );
+                
                 CREATE TABLE IF NOT EXISTS task_dependencies (
                     task_id INTEGER,
                     dependency_id INTEGER,
@@ -226,13 +229,17 @@ class Database:
                     FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
                     FOREIGN KEY (dependency_id) REFERENCES tasks(id) ON DELETE CASCADE
                 );
+                
                 CREATE INDEX IF NOT EXISTS idx_routes_account ON routes(account_id);
                 CREATE INDEX IF NOT EXISTS idx_tasks_route ON tasks(route_id);
                 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
                 CREATE INDEX IF NOT EXISTS idx_tasks_route_status ON tasks(route_id, status);
                 CREATE INDEX IF NOT EXISTS idx_task_dependencies ON task_dependencies(task_id, dependency_id);
+                CREATE INDEX IF NOT EXISTS idx_tasks_module_status ON tasks(module_name, status);
+                CREATE INDEX IF NOT EXISTS idx_tasks_last_executed ON tasks(last_executed);
             """)
-            log.info("Database schema and indexes initialized")
+            
+            log.info("Database schema and indexes initialized with addresses as route IDs")
         except aiosqlite.Error as e:
             log.error(f"Failed to initialize database schema: {str(e)}")
             raise DatabaseError(f"Failed to initialize database: {str(e)}")
@@ -317,36 +324,46 @@ class Database:
     async def create_route(
         cls,
         account_id: int,
+        route_id: str,
         route_name: str,
         modules: list[str],
         dependencies: dict[str, list[str]],
         always_run_modules: list[str] = None
-    ) -> int:
+    ) -> str:
         always_run_modules = always_run_modules or []
 
         async with cls._route_lock:
             async with cls.transaction() as conn:
                 try:
                     cursor = await conn.execute(
-                        "SELECT id FROM routes WHERE account_id = ? AND route_name = ?",
-                        (account_id, route_name)
+                        "SELECT id FROM routes WHERE id = ?",
+                        (route_id,)
                     )
                     existing_route = await cursor.fetchone()
 
-                    route_id = existing_route["id"] if existing_route else None
-
                     if existing_route:
-                        await conn.execute("DELETE FROM tasks WHERE route_id = ?", (route_id,))
-                        await conn.execute(
-                            "UPDATE routes SET status = 'pending' WHERE id = ?",
-                            (route_id,)
-                        )
+                        await conn.execute("""
+                            DELETE FROM tasks 
+                            WHERE route_id = ? 
+                            AND module_name NOT IN ({})
+                        """.format(','.join(['?']*len(always_run_modules))), 
+                        (route_id, *always_run_modules))
+
+                        await conn.execute("""
+                            UPDATE tasks 
+                            SET status = 'pending' 
+                            WHERE route_id = ? 
+                            AND module_name IN ({})
+                        """.format(','.join(['?']*len(always_run_modules))), 
+                        (route_id, *always_run_modules))
                     else:
-                        cursor = await conn.execute(
-                            "INSERT INTO routes (account_id, route_name) VALUES (?, ?)",
-                            (account_id, route_name)
+                        await conn.execute(
+                            "INSERT INTO routes (id, account_id, route_name) VALUES (?, ?, ?)",
+                            (route_id, account_id, route_name)
                         )
-                        route_id = cursor.lastrowid
+
+                    modules = [*modules, *always_run_modules]
+                    modules = list(dict.fromkeys(modules))
 
                     params_for_insert = [(route_id, module, idx) for idx, module in enumerate(modules)]
                     await conn.executemany(
@@ -380,7 +397,7 @@ class Database:
                             dependency_params
                         )
 
-                    log.info(f"Route '{route_name}' created with {len(modules)} tasks")
+                    log.info(f"Route '{route_name}' created with {len(modules)} tasks, id: {route_id}")
                     return route_id
 
                 except Exception as e:
@@ -411,7 +428,11 @@ class Database:
             await cls._release_connection(conn)
             
     @classmethod
-    async def get_tasks_to_run(cls, route_id: int, always_run_modules: list[str]) -> list[dict]:
+    async def get_tasks_to_run(
+        cls,
+        route_id: int,
+        always_run_modules: list[str]
+    ) -> list[dict]:
         conn = await cls._get_connection()
         try:
             query = f"""
@@ -424,25 +445,28 @@ class Database:
             FROM tasks t
             WHERE t.route_id = ?
             AND (
-                t.status = 'pending'
-                AND NOT EXISTS (
-                    SELECT 1 FROM task_dependencies 
-                    WHERE task_id = t.id 
-                    AND dependency_id NOT IN (
-                        SELECT id FROM tasks WHERE status = 'success'
+                (
+                    t.status = 'pending'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM task_dependencies 
+                        WHERE task_id = t.id 
+                        AND dependency_id NOT IN (
+                            SELECT id FROM tasks WHERE status = 'success'
+                        )
                     )
                 )
                 OR (
-                    t.module_name IN ({','.join(['?'] * len(always_run_modules))})
+                    t.module_name IN ({','.join(['?']*len(always_run_modules))})
                     AND (
-                        t.module_name != 'faucet'
-                        OR (
-                            t.module_name = 'faucet'
-                            AND (
-                                t.last_executed IS NULL
-                                OR datetime(t.last_executed, '+24 hours') < CURRENT_TIMESTAMP
-                            )
-                        )
+                        (t.module_name = 'faucet' AND (
+                            datetime(t.last_executed, '+24 hours') < CURRENT_TIMESTAMP 
+                            OR t.last_executed IS NULL
+                        ))
+                        OR
+                        (t.module_name != 'faucet' AND (
+                            datetime(t.last_executed, '+1 hour') < CURRENT_TIMESTAMP 
+                            OR t.last_executed IS NULL
+                        ))
                     )
                 )
             )
@@ -450,33 +474,57 @@ class Database:
             """
             params = [route_id] + always_run_modules
             async with await conn.execute(query, params) as cursor:
-                return [dict(row) async for row in cursor]
+                tasks = [dict(row) async for row in cursor]
+                log.debug(f"Tasks to run for route {route_id}: {[task['module_name'] for task in tasks]}")
+                return tasks
+        finally:
+            await cls._release_connection(conn)
+            
+    @classmethod
+    async def get_task_id(cls, route_id: int, module_name: str) -> int | None:
+        conn = await cls._get_connection()
+        try:
+            async with await conn.execute(
+                "SELECT id FROM tasks WHERE route_id = ? AND module_name = ?",
+                (route_id, module_name)
+            ) as cursor:
+                result = await cursor.fetchone()
+                return result["id"] if result else None
         except aiosqlite.Error as e:
-            log.error(f"Failed to get tasks to run: {str(e)}")
-            raise
+            log.error(f"Failed to get task ID for route {route_id} and module {module_name}: {str(e)}")
+            return None
         finally:
             await cls._release_connection(conn)
 
     @classmethod
-    async def get_route_id(cls, account_id: int, route_name: str) -> int:
+    async def get_route_id(cls, account_id: int, route_name: str) -> str:
         conn = await cls._get_connection()
         try:
             async with await conn.execute(
-                "SELECT id FROM routes WHERE account_id = ? AND route_name = ?",
-                (account_id, route_name)
+                "SELECT address FROM accounts WHERE id = ?",
+                (account_id,)
+            ) as cursor:
+                account = await cursor.fetchone()
+                if not account:
+                    raise DatabaseError(f"Account ID {account_id} not found")
+                address = account["address"]
+            
+            async with await conn.execute(
+                "SELECT id FROM routes WHERE id = ?",
+                (address,)
             ) as cursor:
                 result = await cursor.fetchone()
                 if not result:
-                    raise RouteNotFoundError(f"Route '{route_name}' not found for account ID {account_id}")
+                    raise RouteNotFoundError(f"Route not found for account ID {account_id}")
                 return result["id"]
         except aiosqlite.Error as e:
-            log.error(f"Failed to retrieve route ID for account {account_id}, route '{route_name}': {str(e)}")
+            log.error(f"Failed to retrieve route ID for account {account_id}: {str(e)}")
             raise DatabaseError(f"Failed to retrieve route ID: {str(e)}")
         finally:
             await cls._release_connection(conn)
 
     @classmethod
-    async def update_route_status(cls, route_id: int) -> None:
+    async def update_route_status(cls, route_id: str) -> None:
         async with cls.transaction() as conn:
             try:
                 async with await conn.execute(
@@ -576,7 +624,11 @@ class Database:
                             datetime(t.last_executed, '+24 hours') < CURRENT_TIMESTAMP 
                             OR t.last_executed IS NULL
                         ))
-                        OR t.module_name != 'faucet'
+                        OR
+                        (t.module_name != 'faucet' AND (
+                            datetime(t.last_executed, '+1 hour') < CURRENT_TIMESTAMP 
+                            OR t.last_executed IS NULL
+                        ))
                     )
                 )
             )
@@ -595,19 +647,26 @@ class Database:
     async def update_task_status(cls, task_id: int, status: str, result: str | None = None, error: str | None = None) -> None:
         conn = await cls._get_connection()
         try:
+            async with await conn.execute("SELECT EXISTS(SELECT 1 FROM tasks WHERE id = ?)", (task_id,)) as cursor:
+                exists = (await cursor.fetchone())[0]
+            if not exists:
+                log.warning(f"Task with ID {task_id} does not exist. Skipping update.")
+                return
+
             await conn.execute(
                 """
                 UPDATE tasks 
-                SET status = ?, result = ?, error_message = ?, last_executed = CASE 
-                    WHEN module_name = 'faucet' AND ? = 'success' THEN CURRENT_TIMESTAMP 
-                    ELSE last_executed 
-                END
+                SET 
+                    status = ?, 
+                    result = ?, 
+                    error_message = ?, 
+                    last_executed = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
-                (status, result, error, status, task_id)
+                (status, result, error, task_id)
             )
             await conn.commit()
-            log.info(f"Task {task_id} status updated to '{status}'")
+            log.info(f"Task {task_id} updated with status '{status}'")
         except aiosqlite.Error as e:
             log.error(f"Failed to update task {task_id} status: {str(e)}")
             raise DatabaseError(f"Failed to update task status: {str(e)}")
@@ -622,10 +681,10 @@ class Database:
                 await conn.executemany(
                     """
                     UPDATE tasks 
-                    SET status = ?, result = ?, error_message = ?, last_executed = CASE 
-                        WHEN module_name = 'faucet' AND ? = 'success' THEN CURRENT_TIMESTAMP 
-                        ELSE last_executed 
-                    END
+                    SET status = ?, 
+                        result = ?, 
+                        error_message = ?, 
+                        last_executed = CURRENT_TIMESTAMP
                     WHERE id = ?
                     """,
                     params

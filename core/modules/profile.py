@@ -318,7 +318,7 @@ class ProfileModule(SomniaClient):
             if error_messages:
                 combined_error = "; ".join(error_messages)
                 log.error(f"Account {self.wallet_address} | Profile setup completed with errors: {combined_error}")
-                return False, combined_error
+                return True, combined_error
             else:
                 log.success(f"Account {self.wallet_address} | Profile setup completed successfully")
                 return True, "Successfully setup profile"

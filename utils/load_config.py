@@ -106,6 +106,12 @@ class ConfigLoader:
                     f'Missing required fields: {", ".join(missing_fields)}'
                 )
 
+            if 'delay_between_tasks' not in config:
+                config['delay_between_tasks'] = {
+                    'min': 30,
+                    'max': 120
+                }
+
             if 'always_run_tasks' not in config:
                 config['always_run_tasks'] = {
                     'by_id': [],

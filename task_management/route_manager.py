@@ -27,7 +27,7 @@ class RouteManager:
 
     DEPENDENCIES: dict[str, list[str]] = {
         "profile": [],
-        "faucet": ["profile"],
+        "faucet": [],
         "mint_ping_pong": ["faucet"],
         "swap_ping_pong": ["mint_ping_pong"],
         "transfer_stt": ["faucet"],
@@ -71,12 +71,14 @@ class RouteManager:
         graph: defaultdict[str, list[str]] = defaultdict(list)
         in_degree: dict[str, int] = {module: 0 for module in modules}
 
+        # Формируем граф зависимостей
         for module in modules:
             for dep in RouteManager.DEPENDENCIES.get(module, []):
                 if dep in modules:
                     graph[dep].append(module)
                     in_degree[module] += 1
 
+        # Топологическая сортировка
         queue: deque[str] = deque([module for module in modules if in_degree[module] == 0])
         levels: defaultdict[int, list[str]] = defaultdict(list)
         level = 0
@@ -92,10 +94,12 @@ class RouteManager:
                         queue.append(neighbor)
             level += 1
 
+        # Проверка на циклические зависимости
         if sum(len(tasks) for tasks in levels.values()) != len(modules):
             log.error("Cyclic dependency detected")
             return []
 
+        # Формируем упорядоченный список задач
         ordered_modules: list[str] = []
         if shuffle:
             for lvl in levels:
@@ -110,12 +114,13 @@ class RouteManager:
     @staticmethod
     async def create_route_for_account(
         account: Account, 
-        route_name: str = "default", 
+        route_name: str = None, 
         shuffle: bool = True
-    ) -> int:
+    ) -> str:
         async with RouteManager._semaphore:
             address = get_address(account.private_key)
-            route_name = route_name or f"route_{address[:8]}"
+            route_name = route_name or "standard_route"
+            route_id = address
 
             try:
                 account_id = await Database.get_account_id(account.private_key)
@@ -128,25 +133,30 @@ class RouteManager:
                 modules = RouteManager.generate_route_modules(shuffle=shuffle)
                 if not modules:
                     log.error("No modules available for route creation")
-                    return 0
+                    return ""
 
-                route_id = await Database.create_route(
+                created_route_id = await Database.create_route(
                     account_id=account_id,
+                    route_id=route_id,
                     route_name=route_name,
                     modules=modules,
                     dependencies=RouteManager.DEPENDENCIES,
                     always_run_modules=config.always_run_tasks.modules
                 )
-                log.success(f"Account: {address} | Route '{route_name}' created")
-                return route_id
+                log.success(f"Account: {address} | Route '{route_name}' created with ID {created_route_id}")
+                return created_route_id
             except Exception as e:
                 log.error(f"Failed to create route: {str(e)}")
-                return 0
+                return ""
     
     @staticmethod
     async def create_routes_for_all_accounts(accounts: list[Account]) -> None:
         tasks = [
-            RouteManager.create_route_for_account(account, shuffle=True)
+            RouteManager.create_route_for_account(
+                account, 
+                route_name=get_address(account.private_key),
+                shuffle=True
+            )
             for account in accounts
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -158,11 +168,14 @@ class RouteManager:
         # await RouteManager.print_detailed_routes()
 
     @staticmethod
-    async def get_tasks_to_run(account: Account, route_name: str = "default") -> list[dict]:
+    async def get_tasks_to_run(account: Account, route_name: str = None) -> list[dict]:
         try:
             account_id = await Database.get_account_id(account.private_key)
             if not account_id:
                 return []
+            
+            if route_name is None:
+                route_name = get_address(account.private_key)
 
             route_id = await Database.get_route_id(account_id, route_name)
             return await Database.get_tasks_to_run(route_id, config.always_run_tasks.modules)
