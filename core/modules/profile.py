@@ -282,6 +282,8 @@ class ProfileModule(SomniaClient):
                 else:
                     await random_sleep(self.wallet_address, **sleep_after_username_creation)
 
+            if not self.account.telegram_session:
+                error_messages.append("Telegram session not found")
             if "telegramName" in null_fields and self.account.telegram_session:
                 status, result = await self.connect_telegram_account()
                 if not status:
@@ -289,6 +291,8 @@ class ProfileModule(SomniaClient):
                 else:
                     await random_sleep(self.wallet_address, **sleep_after_telegram_connection)
 
+            if not self.account.auth_tokens_discord:
+                error_messages.append("Discord auth tokens not found")
             if "discordName" in null_fields and self.account.auth_tokens_discord:
                 status, result = await self.connect_discord_account()
                 if not status:
@@ -296,6 +300,8 @@ class ProfileModule(SomniaClient):
                 else:
                     await random_sleep(self.wallet_address, **sleep_after_discord_connection)
 
+            if not self.account.auth_tokens_twitter:
+                error_messages.append("Twitter auth tokens not found")
             if "twitterName" in null_fields and self.account.auth_tokens_twitter:
                 status, result = await self.connect_twitter_account()
                 if not status:
