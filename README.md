@@ -91,7 +91,7 @@ The private key can be with “0x” or without, it does not matter, because the
 ...
 ```
 
-#### auth_tokens.txt (for Twitter)
+#### auth_tokens_twitter.txt (for Twitter)
 ```
 auth_token1
 auth_token2
