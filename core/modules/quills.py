@@ -95,8 +95,9 @@ class QuillsMessageModule:
                     verify=False
                 )
                 
-                if response and await self._process_api_response(response, f"minted an nft message: {message}"):
-                    return True, "Successfully minted an nft message"
+                status, result = await self._process_api_response(response, f"minted an nft message: {message}")
+                if status:
+                    return status, result
                     
                 if attempt < max_attempts:
                     await random_sleep(self.wallet_address)
@@ -116,10 +117,7 @@ class QuillsMessageModule:
         if not await self.auth():
             return False, "Failed to authorize on the site quills.fun"
         
-        if not await self.mint_message_nft():
-            return False, "Failed to mint an nft message"
-        
-        return True, "Successfully completed all tasks"
+        return await self.mint_message_nft()
     
 
 class QuillsDeployContractModule(Wallet):

@@ -1,4 +1,4 @@
-import json
+import orjson
 from pathlib import Path
 from typing import Self
 
@@ -101,9 +101,9 @@ class Config(BaseModel):
             config_path = Path(config_path)
         
         try:
-            raw_data = json.loads(config_path.read_text(encoding='utf-8'))
+            raw_data = orjson.loads(config_path.read_text(encoding='utf-8'))
             return cls.model_validate(raw_data)
         except FileNotFoundError as e:
             raise FileNotFoundError(f"Config file not found: {config_path}") from e
-        except json.JSONDecodeError as e:
+        except orjson.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in config file: {config_path}") from e

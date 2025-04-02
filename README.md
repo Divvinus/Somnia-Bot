@@ -52,7 +52,7 @@ A multifunctional bot for automating interactions with the Somnia Network testne
 
 ## 📋 System Requirements
 
-- Python 3.10 or higher
+- Python 3.11 or higher
 - Windows/Linux
 - Discord account
 - Twitter account
@@ -84,9 +84,10 @@ pip install -r requirements.txt
 Create the following files in the `config/data/` directory:
 
 #### wallets.txt
+The private key can be with “0x” or without, it does not matter, because the software will automatically make your private keys look properly
 ```
-private_key_or_mnemonic
-private_key_or_mnemonic
+7aa8c1cc3719f7678d...d748f800ba6590
+0х7aa8c1cc3719f7678d...d748f800ba6590
 ...
 ```
 
@@ -111,24 +112,33 @@ discord_token2
  Example: 0x123abc...def.session
 ```
 
-#### proxies.txt (optional)
+#### proxies.txt
+The software supports the following types of proxies:
+HTTP/HTTPS and SOCKS5
 ```
-login:password@ip:port
-login:password@ip:port
+http://123.45.67.89:8080
+https://[2001:db8::1]:8080 (IPv6)
+
+http://user:pass@123.45.67.89:8080
+https://user:pass@[2001:db8::1]:8080 (IPv6)
+
+socks5://123.45.67.89:1080
+socks5://[2001:db8::1]:1080 (IPv6)
+
+socks5://user:pass@123.45.67.89:1080
+socks5://user:pass@[2001:db8::1]:1080 (IPv6)
 ...
 ```
 
 ### 2. Advanced Settings (for experienced users)
 
-The following settings are available in `config/settings.py`:
+The settings for advanced users can be found in the file `config/settings.py`:
 
-- Thread Configuration
-  - Number of threads for referral recruiting
+- Account shuffle flag
+  - Flag that disables/enables mixing the order of execution of accounts
 
 - Delay Configuration
-  - Delays between registrations
-  - Delays between token requests
-  - Delays between account actions
+  - Settings of delays between critical tasks, more details in the comments in the file
 
 ### 3. Twitter Setup
 
@@ -168,6 +178,13 @@ delay_before_start:
     min: 1
     max: 100
 
+
+# Delay between tasks (seconds)
+delay_between_tasks:
+    min: 60
+    max: 300
+
+
 #------------------------------------------------------------------------------
 # Telegram API hash and ID
 #------------------------------------------------------------------------------
@@ -181,16 +198,6 @@ telegram_api_hash: "YOUR_API_HASH"
 # Referral code for standard account registration
 referral_code: "YOUR_REFERRAL_CODE"
 
-#------------------------------------------------------------------------------
-# Network Settings
-#------------------------------------------------------------------------------
-# Somnia Testnet RPC endpoint
-somnia_rpc: https://dream-rpc.somnia.network
-
-# Somnia Testnet Explorer
-somnia_explorer: https://shannon-explorer.somnia.network/
-```
-
 Note: For Telegram functionality, you must obtain `api_id` and `api_hash` values from the [Telegram API Development Tools](https://my.telegram.org/apps).
 
 ## 🚀 Launch
@@ -202,19 +209,14 @@ python run.py
 ## 📚 Available Commands
 
 After launching the bot, the following options are available:
-1. 👤 Profile - Set up your profile and connect social accounts
-2. 🏆 Account statistics - View detailed account metrics and progress
-3. 🔑 Get referral code - Obtain your account's referral code
-4. 💰 Faucet - Claim test tokens from Somnia faucet
-5. 💸 Transfer STT - Transfer STT tokens between wallets
-6. 🏓 Mint $Ping and $Pong - Create Ping and Pong tokens
-7. 💱 Swap $Ping and $Pong - Exchange Ping and Pong tokens
-8. 🚰 Mint $sUSDT - Mint test USDT tokens
-9. 💬 Send and mint message NFT - Create NFTs with messages
-10. 🏗 Deploy token contract - Deploy your own token contract
-11. 🍀 Quest: "Somnia Testnet Odyssey - Socials" - Complete social media tasks
-12. 🍀 Quest: "Somnia Testnet Odyssey - Sharing is Caring" - Complete token sharing tasks
-13. 🚪 Exit - Exit the application
+1. 🏆 Account statistics - View detailed account metrics and progress
+2. 🔑 Get referral code - Obtain your account's referral code
+3. 💰 Faucet (Account validity check) - The module allows to sift eligible wallets before forming routes, the private keys of these wallets are filled in the file config\data\client\bad_private_key.txt.
+4. 🔄 Generate routes - Generate routes for the bot to execute
+5. 📊 View route statistics - View statistics of executed routes
+6. 📈 View full statistics - View full statistics of the bot
+7. ▶️ Execute route - Execute a selected route
+8. 🚪 Exit - Exit the application
 
 ## 🌟 Social Quests
 

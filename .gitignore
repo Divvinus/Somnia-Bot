@@ -168,3 +168,11 @@ config/data/client/auth_tokens_discord.txt
 config/data/client/bad_private_key.txt
 config/data/client/my_refferal_codes.txt
 config/settings.yaml
+
+# Database
+db/data_bd/database.db
+db/data_bd/database.db-shm
+db/data_bd/database.db-wal
+
+# Sessions Telegram
+config/data/client/telegram_session/

@@ -1,6 +1,6 @@
 import asyncio
 import random
-import json
+import orjson
 import ssl as ssl_module
 from types import TracebackType
 from typing import Literal, Any, Self, Type
@@ -260,16 +260,16 @@ class BaseAPIClient:
             result["text"] = text
             
             try:
-                json_data = json.loads(text)
+                json_data = orjson.loads(text)
                 result["data"] = json_data
-            except json.JSONDecodeError:
+            except orjson.JSONDecodeError:
                 pass
             
             if 'application/json' in content_type or 'json' in content_type:
                 if result["data"] is None:
-                    raise json.JSONDecodeError("JSON expected but not parsed", "", 0)
+                    raise orjson.JSONDecodeError("JSON expected but not parsed", "", 0)
                     
-        except json.JSONDecodeError as e:
+        except orjson.JSONDecodeError as e:
             log.warning(f"JSON decode failed: {e}")
         except Exception as e:
             log.error(f"Error parsing response: {str(e)}")

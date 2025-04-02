@@ -1,5 +1,4 @@
-import asyncio
-import json
+import orjson
 from functools import cached_property
 from typing import Dict, Optional
 
@@ -210,7 +209,7 @@ class ProfileModule(SomniaClient):
 
         try:
             payload = {"referralCode": self.referral_code, "product": "QUEST_PLATFORM"}
-            message_to_sign = json.dumps(payload, separators=(",", ":"))
+            message_to_sign = orjson.dumps(payload, separators=(",", ":"))
             signature = await self.get_signature(message_to_sign)
 
             headers = {

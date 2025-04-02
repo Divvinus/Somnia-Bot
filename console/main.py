@@ -18,40 +18,24 @@ sys.path.append(os.path.realpath("."))
 
 class Console:
     MODULES = (
-        "👤 Profile",
         "🏆 Account statistics",
         "🔑 Get referral code",
-        "💰 Faucet",
-        "💸 Transfer STT",
-        "🏓 Mint $Ping and $Pong",
-        "💱 Swap $Ping and $Pong",
-        "🚰 Mint $sUSDT",
-        "💬 Send and mint message nft",
-        "🏗  Deploy token contract",
-        '🍀 Quest: "Somnia Testnet Odyssey - Socials"',
-        '🍀 Quest: "Somnia Testnet Odyssey - Sharing is Caring"',
-        "🔄 Сгенерировать маршруты",
-        "📊 Просмотр статистики маршрутов",
-        "▶️ Выполнить маршрут",
+        "💰 Faucet (Account validity check)",
+        "🔄 Generate routes",
+        "📊 View route statistics",
+        "📈 View full statistics",
+        "▶️  Execute route",
         "🚪 Exit",
     )
     
     MODULES_DATA = {
-        "👤 Profile": "profile",
         "🏆 Account statistics": "account_statistics",
         "🔑 Get referral code": "get_referral_code",
-        "💰 Faucet": "faucet",
-        "💸 Transfer STT": "transfer_stt",
-        "🏓 Mint $Ping and $Pong": "mint_ping_pong",
-        "💱 Swap $Ping and $Pong": "swap_ping_pong",
-        "🚰 Mint $sUSDT": "mint_usdt",
-        "💬 Send and mint message nft": "mint_message_nft",
-        "🏗  Deploy token contract": "deploy_token_contract",
-        '🍀 Quest: "Somnia Testnet Odyssey - Socials"': "quest_socials",
-        '🍀 Quest: "Somnia Testnet Odyssey - Sharing is Caring"': "quest_sharing",
-        "🔄 Сгенерировать маршруты": "generate_routes",
-        "📊 Просмотр статистики маршрутов": "view_routes",
-        "▶️ Выполнить маршрут": "execute_route",
+        "💰 Faucet (Account validity check)": "faucet",
+        "🔄 Generate routes": "generate_routes",
+        "📊 View route statistics": "view_routes",
+        "📈 View full statistics": "view_statistics",
+        "▶️  Execute route": "execute_route",
         "🚪 Exit": "exit"
     }
 

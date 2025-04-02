@@ -14,6 +14,8 @@ from web3.types import Nonce, TxParams
 
 from core.exceptions.base import InsufficientFundsError, WalletError
 from models.onchain import *
+import asyncio
+from logger import log
 
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
@@ -131,7 +133,11 @@ class Wallet(AsyncWeb3, Account):
         return float(Decimal(str(amount)) / Decimal(str(10 ** decimals)))
 
     async def transactions_count(self) -> Nonce:
-        return await self.eth.get_transaction_count(self.keypair.address)
+        try:
+            return await self.eth.get_transaction_count(self.keypair.address, 'pending')
+        except Exception as e:
+            log.error(f"Error during getting nonce: {str(e)}")
+            raise
 
     async def check_balance(self) -> None:
         balance = await self.eth.get_balance(self.keypair.address)
@@ -173,10 +179,42 @@ class Wallet(AsyncWeb3, Account):
         return HexStr(signature.signature.hex())
 
     async def send_and_verify_transaction(self, trx: Any) -> Tuple[bool, str]:
-        signed = self.keypair.sign_transaction(trx)
-        tx_hash = await self.eth.send_raw_transaction(signed.raw_transaction)
-        receipt = await self.eth.wait_for_transaction_receipt(tx_hash)
-        return receipt["status"] == 1, tx_hash.hex()
+        max_attempts = 3
+        current_attempt = 0
+        last_error = None
+        
+        while current_attempt < max_attempts:
+            try:
+                signed = self.keypair.sign_transaction(trx)
+                tx_hash = await self.eth.send_raw_transaction(signed.raw_transaction)
+                receipt = await self.eth.wait_for_transaction_receipt(tx_hash)
+                return receipt["status"] == 1, tx_hash.hex()
+                
+            except Exception as e:
+                error_str = str(e)
+                last_error = e
+                current_attempt += 1
+                
+                if "NONCE_TOO_SMALL" in error_str or "nonce too low" in error_str.lower():
+                    log.warning(f"Nonce too small. Current: {trx.get('nonce')}. Getting new nonce.")
+                    try:
+                        new_nonce = await self.eth.get_transaction_count(self.keypair.address, 'pending')
+                        trx['nonce'] = new_nonce
+                    except Exception as nonce_error:
+                        log.error(f"Error during getting new nonce: {str(nonce_error)}")
+                        
+                elif "NONCE_TOO_HIGH" in error_str or "nonce too high" in error_str.lower():
+                    log.warning(f"Nonce too high. Current: {trx.get('nonce')}. Decreasing.")
+                    if 'nonce' in trx and trx['nonce'] > 0:
+                        trx['nonce'] = trx['nonce'] - 1
+                        
+                else:
+                    log.error(f"Error during sending transaction: {error_str}")
+                    return False, error_str
+                    
+                await asyncio.sleep(2)
+        
+        return False, f"Failed to execute transaction after {max_attempts} attempts. Last error: {str(last_error)}"
 
     async def _check_and_approve_token(
         self, 

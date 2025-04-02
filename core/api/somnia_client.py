@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 from pathlib import Path
 from core.api import BaseAPIClient
 from core.wallet import Wallet
