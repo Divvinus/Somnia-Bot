@@ -115,16 +115,38 @@ class FaucetModule(Wallet, BaseAPIClient):
         return True, "Successfully requested test tokens"
     
     async def _save_bad_private_key(self) -> None:
-        file_path = os.path.join("config", "data", "client", "bad_private_key.txt")
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        config_dir = os.path.join("config", "data", "client")
+        bad_key_path = os.path.join(config_dir, "bad_private_key.txt")
+        private_keys_path = os.path.join(config_dir, "private_keys.txt")
+        os.makedirs(config_dir, exist_ok=True)
+        
+        private_key = self.account.private_key
         
         async with file_lock:
             try:
-                async with aiofiles.open(file_path, 'a') as file:
-                    await file.write(f"{self.account.private_key}\n")
-                    await file.flush()
+                async with aiofiles.open(bad_key_path, 'a') as file:
+                    await file.write(f"{private_key}\n")
+                
+                if os.path.exists(private_keys_path):
+                    temp_path = private_keys_path + '.tmp'
+                    key_found = False
+                    
+                    async with aiofiles.open(private_keys_path, 'r') as source:
+                        async with aiofiles.open(temp_path, 'w') as target:
+                            async for line in source:
+                                if line.strip() != private_key:
+                                    await target.write(line)
+                                else:
+                                    key_found = True
+                    
+                    if key_found:
+                        os.replace(temp_path, private_keys_path)
+                        log.info(f"Account {self.wallet_address} | Removed bad private key")
+                    else:
+                        os.remove(temp_path)
+                        
             except Exception as e:
-                log.error(f"Account {self.wallet_address} | Error saving private key: {str(e)}")
+                log.error(f"Account {self.wallet_address} | Error processing private key: {str(e)}")
     
     async def run(self) -> tuple[bool, str]:
         log.info(f"Account {self.wallet_address} | Processing faucet...")
