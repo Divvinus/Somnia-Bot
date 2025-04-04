@@ -21,24 +21,10 @@ class MintUsdtModule(Wallet):
                 log.success(msg)
                 return True, "before"
 
-            mint_function = contract.functions.mint()
-            tx_params = {
-                "nonce": await self.transactions_count(),
-                "gasPrice": await self.eth.gas_price,
-                "from": self.wallet_address,
-                "value": 0,
-            }
-
-            try:
-                gas_estimate = await mint_function.estimate_gas(tx_params)
-                tx_params["gas"] = int(gas_estimate * 1.2)
-            except Exception as estimate_error:
-                log.debug(f"Gas estimate failed: {estimate_error}. Using fallback value")
-                tx_params["gas"] = 3_000_000
-
-            transaction = await mint_function.build_transaction(tx_params)
-            await self.check_trx_availability(transaction)
-            return await self._process_transaction(transaction)
+            tx_params = await self.build_transaction_params(
+                contract.functions.mint()
+            )
+            return await self._process_transaction(tx_params)
 
         except Exception as error:
             error_msg = f"Account {self.wallet_address} | Error mint 1000 $sUSDT: {error!s}"

@@ -42,25 +42,10 @@ class MintPingPongModule(Wallet):
                 log.success(msg)
                 return True, "already_minted"
 
-            tx_params = {
-                "nonce": await self.transactions_count(),
-                "gasPrice": await self.eth.gas_price,
-                "from": self.wallet_address,
-                "value": 0,
-            }
-
-            mint_function = contract.functions.mint()
-
-            try:
-                gas_estimate = await mint_function.estimate_gas(tx_params)
-                tx_params["gas"] = int(gas_estimate * 1.2)
-            except Exception as estimate_error:
-                log.debug(f"Gas estimate failed: {estimate_error}. Using fallback value")
-                tx_params["gas"] = 3_000_000
-
-            transaction = await mint_function.build_transaction(tx_params)
-            await self.check_trx_availability(transaction)
-            return await self._process_transaction(transaction)
+            tx_params = await self.build_transaction_params(
+                contract.functions.mint()
+            )
+            return await self._process_transaction(tx_params)
 
         except Exception as error:
             log.error(f"Account {self.wallet_address} | Error: {error!s}")
@@ -185,31 +170,18 @@ class SmapPingPongModule(Wallet):
                 0,
                 0,
             )
-
-            swap_function = router_contract.functions.exactInputSingle(params)
-            tx_params = {
-                "nonce": await self.transactions_count(),
-                "gasPrice": await self.eth.gas_price,
-                "from": self.wallet_address,
-                "value": 0,
-            }
-
-            try:
-                gas_estimate = await swap_function.estimate_gas(tx_params)
-                tx_params["gas"] = int(gas_estimate * 1.2)
-            except Exception as estimate_error:
-                log.debug(f"Gas estimate failed: {estimate_error}. Using fallback value")
-                tx_params["gas"] = 3_000_000
-
+            
+            tx_params = await self.build_transaction_params(
+                router_contract.functions.exactInputSingle(params)
+            )
+            
             log.info(
                 f"Account {self.wallet_address} | "
                 f"Swap {self.from_wei(amount_to_swap, 'ether')} "
                 f"{token_in_name} to {token_out_name}"
             )
-
-            transaction = await swap_function.build_transaction(tx_params)
-            await self.check_trx_availability(transaction)
-            return await self._process_transaction(transaction)
+            
+            return await self._process_transaction(tx_params)
 
         except Exception as error:
             log.error(f"Account {self.wallet_address} | Error: {error!s}")

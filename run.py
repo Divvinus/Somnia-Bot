@@ -2,7 +2,7 @@ import asyncio
 import os
 import sys
 
-from loader import config, progress, semaphore
+from loader import config, progress
 from logger import log
 from db import Database
 from utils import setup

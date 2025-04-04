@@ -47,18 +47,13 @@ class TransferSTTModule(Wallet):
                 self.wallet_address if self.me 
                 else self.generate_eth_address()
             )
+            
+            tx_params = await self.build_transaction_params(
+                to=to_address,
+                value=self.to_wei(amount, "ether")
+            )
 
-            transaction = {
-                "from": self.wallet_address,
-                "to": to_address,
-                "value": self.to_wei(amount, "ether"),
-                "nonce": await self.transactions_count(),
-                "gasPrice": await self.eth.gas_price,
-                "gas": self.GAS_LIMIT,
-            }
-
-            await self.check_trx_availability(transaction)
-            status, tx_hash = await self._process_transaction(transaction)
+            status, tx_hash = await self._process_transaction(tx_params)
 
             show_trx_log(
                 self.wallet_address,
