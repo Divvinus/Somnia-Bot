@@ -1,5 +1,4 @@
 import asyncio
-import weakref
 from decimal import Decimal
 from typing import Any, Union
 
@@ -45,7 +44,6 @@ class Wallet(AsyncWeb3, Account):
         
         self.private_key = self._initialize_private_key(private_key)
         self._contracts_cache: dict[str, AsyncContract] = {}
-        weakref.finalize(self, self._close_session)
         self._throttler = Throttler(rate_limit=10, period=1)
         
     async def __aenter__(self):
