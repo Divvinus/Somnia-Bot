@@ -1,10 +1,15 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
 from typing import Any
 
 from config.settings import sleep_between_tasks
 from core.api import SomniaClient
-from core.modules import ProfileModule, TransferSTTModule
+from core.modules import (
+    ProfileModule, 
+    TransferSTTModule, 
+    TwitterTasksModule,
+    DiscordTasksModule
+)
 from loader import config
 from logger import log
 from models import Account
@@ -83,7 +88,6 @@ class BaseQuestModule(SomniaClient, ABC):
         log.error(log_msg)
         return False, "other_error"
 
-    @abstractmethod
     async def _send_verification_request(
         self,
         quest_id: int,
@@ -91,14 +95,21 @@ class BaseQuestModule(SomniaClient, ABC):
         success_msg: str,
         error_msg: str,
     ) -> tuple[bool, str | None]:
-        pass
+        json_data = {"questId": quest_id}
+        response = await self.send_request(
+            request_type="POST",
+            method=endpoint,
+            headers=self._get_base_headers(auth=True),
+            json_data=json_data,
+        )
+        return self._process_response(response, success_msg, error_msg)
 
     async def run(self) -> tuple[bool, str]:
         try:
             class_name = self.__class__.__name__
             quest_name = class_name.replace("Module", "").replace("Quest", "")
             
-            log.info(f'Account {self.wallet_address} | Starting quest: "Somnia Testnet Odyssey - {quest_name}" processing...')
+            log.info(f'Account: {self.wallet_address} | Starting quest: "Somnia Testnet Odyssey - {quest_name}" processing...')
             
             excluded_quests = set()
             fatal_error = False
@@ -107,21 +118,21 @@ class BaseQuestModule(SomniaClient, ABC):
                 if fatal_error:
                     break
                     
-                log.info(f'Account {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | Attempt {attempt}/3')
+                log.info(f'Account: {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | Attempt {attempt}/3')
                 
                 quests_data = await self.get_quests()
                 if not quests_data or not isinstance(quests_data, dict):
-                    log.error(f'Account {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | Failed to get quests data')
+                    log.error(f'Account: {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | Failed to get quests data')
                     continue
                     
                 incomplete = self.get_incomplete_quests(quests_data)
                 if not incomplete:
-                    log.success(f'Account {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | All quests completed!')
+                    log.success(f'Account: {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | All quests completed!')
                     return True, "All quests completed"
                     
                 filtered_quests = [q for q in incomplete if q not in excluded_quests]
                 if not filtered_quests:
-                    log.error(f'Account {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | No processable quests remaining')
+                    log.error(f'Account: {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | No processable quests remaining')
                     return False, "No processable quests remaining"
 
                 results = []
@@ -143,7 +154,7 @@ class BaseQuestModule(SomniaClient, ABC):
                             fatal_error = True
 
                 if all(results):
-                    log.success(f'Account {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | Completed available quests!')
+                    log.success(f'Account: {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | Completed available quests!')
                     return True, "Completed available quests"
                     
                 if not any(results):
@@ -151,14 +162,14 @@ class BaseQuestModule(SomniaClient, ABC):
 
             final_check = await self.get_quests()
             if final_check and not self.get_incomplete_quests(final_check):
-                log.success(f'Account {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | All quests completed!')
+                log.success(f'Account: {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | All quests completed!')
                 return True, "All quests completed"
             
-            log.error(f'Account {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | Failed to complete all quests')
+            log.error(f'Account: {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | Failed to complete all quests')
             return False, "Failed to complete all quests"
 
         except Exception as error:
-            log.error(f'Account {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | Critical error: {error!s}')
+            log.error(f'Account: {self.wallet_address} | Quest: "Somnia Testnet Odyssey - {quest_name}" | Critical error: {error!s}')
             return False, f"Critical error: {error!s}"
 
 
@@ -207,22 +218,6 @@ class QuestSharingModule(BaseQuestModule):
             error_msg="Failed to verify STT token request",
         )
 
-    async def _send_verification_request(
-        self,
-        quest_id: int,
-        endpoint: str,
-        success_msg: str,
-        error_msg: str,
-    ) -> tuple[bool, str | None]:
-        json_data = {"questId": quest_id}
-        response = await self.send_request(
-            request_type="POST",
-            method=endpoint,
-            headers=self._get_base_headers(auth=True),
-            json_data=json_data,
-        )
-        return self._process_response(response, success_msg, error_msg)
-
     async def _send_tx_verification(
         self,
         quest_id: int,
@@ -256,24 +251,8 @@ class QuestSocialsModule(BaseQuestModule):
             )
         )
 
-    async def _send_verification_request(
-        self,
-        quest_id: int,
-        endpoint: str,
-        success_msg: str,
-        error_msg: str,
-    ) -> tuple[bool, str | None]:
-        json_data = {"questId": quest_id}
-        response = await self.send_request(
-            request_type="POST",
-            method=endpoint,
-            headers=self._get_base_headers(auth=True),
-            json_data=json_data,
-        )
-        return self._process_response(response, success_msg, error_msg)
-
     async def handle_connect_telegram(self) -> tuple[bool, str | None]:
-        log.info(f'Account {self.wallet_address} | Processing "Connect Telegram"')
+        log.info(f'Account: {self.wallet_address} | Processing "Connect Telegram"')
         return await self._send_verification_request(
             quest_id=60,
             endpoint="/social/telegram/connect",
@@ -309,10 +288,68 @@ class QuestSocialsModule(BaseQuestModule):
         )
     
     async def handle_connect_twitter(self) -> tuple[bool, str | None]:
-        log.info(f'Account {self.wallet_address} | Processing "Connect Twitter"')
+        log.info(f'Account: {self.wallet_address} | Processing "Connect Twitter"')
         return await self._send_verification_request(
             quest_id=64,
             endpoint="/social/twitter/connect",
             success_msg="Successfully verified Twitter connection",
             error_msg="Failed to verify Twitter connection",
         )
+        
+
+class QuestDarktableModule(BaseQuestModule):
+    def __init__(self, account: Account) -> None:
+        super().__init__(
+            account,
+            QuestConfig(
+                campaign_id=10,
+                quest_handlers={
+                    48: "handle_twitter_follow",
+                    49: "handle_retweet",
+                    # 50: "handle_join_discord"
+                }
+            )
+        )
+        
+    async def handle_twitter_follow(self) -> tuple[bool, str | None]:
+        log.info(f'Account: {self.wallet_address} | Processing "Twitter Follow"')
+        return await self._send_verification_request(
+            quest_id=48,
+            endpoint="/social/twitter/follow",
+            success_msg="Successfully verified Twitter follow",
+            error_msg="Failed to verify Twitter follow",
+        )
+        
+    async def handle_retweet(self) -> tuple[bool, str | None]:
+        log.info(f'Account: {self.wallet_address} | Processing "Retweet"')
+        
+        if not await TwitterTasksModule(self.account).retweet_tweeet_darktable():
+            return False, "Failed to retweet"
+        
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        
+        return await self._send_verification_request(
+            quest_id=49,
+            endpoint="/social/twitter/retweet",
+            success_msg="Successfully verified Twitter retweet",
+            error_msg="Failed to verify Twitter retweet",
+        )
+    
+    # async def handle_join_discord(self) -> tuple[bool, str | None]:
+    #     log.info(f'Account: {self.wallet_address} | Processing "Join Discord"') 
+        
+    #     guild_id = "1351624540676952135"
+    #     channel_id = "1351624541239246981"
+        
+    #     async with DiscordTasksModule(self.account) as discord_module:
+    #         if not await discord_module.join_server("darktableccg", guild_id, channel_id):
+    #             return False, "Failed to join Discord"
+        
+    #     await random_sleep(self.wallet_address, **sleep_between_tasks)
+        
+    #     return await self._send_verification_request(
+    #         quest_id=50,
+    #         endpoint="/social/discord/join",
+    #         success_msg="Successfully verified Discord join",
+    #         error_msg="Failed to verify Discord join",
+    #     )

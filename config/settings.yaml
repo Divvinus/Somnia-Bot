@@ -56,7 +56,7 @@ available_modules:
   - "deploy_token_contract"  # Деплой контракта токена
   - "quest_socials"     # Квест по социальным сетям
   - "quest_sharing"     # Квест по шерингу
-
+  - "quest_darktable"   # Квест по Darktable
 
 #------------------------------------------------------------------------------
 # Network Settings

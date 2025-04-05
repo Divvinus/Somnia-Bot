@@ -20,13 +20,13 @@ class ProfileModule(SomniaClient):
         super().__init__(account)
         self.twitter_worker = TwitterClient(account)
         self.telegram_worker = TelegramClient(account)
-        self.account = account
-        self.referral_code = referral_code            
-        self._me_info_cache: Optional[Dict] = None
-        self._discord_worker = None
+        self.account: Account = account
+        self.referral_code: str | None = referral_code            
+        self._me_info_cache: dict | None = None
+        self._discord_worker: DiscordClient | None = None
 
     @property
-    def discord_worker(self) -> Optional[DiscordClient]:
+    def discord_worker(self) -> DiscordClient | None:
         if self._discord_worker is None and self.account.auth_tokens_discord:
             self._discord_worker = DiscordClient(self.account)
         return self._discord_worker

@@ -23,6 +23,7 @@ class RouteManager:
         "deploy_token_contract",
         "quest_socials",
         "quest_sharing",
+        "quest_darktable",
     ]
 
     DEPENDENCIES: dict[str, list[str]] = {
@@ -36,6 +37,7 @@ class RouteManager:
         "deploy_token_contract": ["faucet"],
         "quest_socials": ["profile"],
         "quest_sharing": ["faucet"],
+        "quest_darktable": ["profile"],
     }
     
     @staticmethod
