@@ -155,7 +155,7 @@ class QuillsDeployContractModule(Wallet):
 
         deploy_tx = await contract.constructor(name, symbol, initial_supply_wei).build_transaction({
             'from': self.wallet_address,
-            'nonce': await self.transactions_count(),
+            'nonce': await self.get_nonce(),
             'gasPrice': await self.eth.gas_price,
         })
 

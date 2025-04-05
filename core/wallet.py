@@ -255,6 +255,12 @@ class Wallet(AsyncWeb3, Account):
             **kwargs
         }
 
+        try:
+            chain_id = await self.eth.chain_id
+            base_params["chainId"] = chain_id
+        except Exception as e:
+            log.warning(f"Failed to get chain_id: {e}", exc_info=True)
+
         if contract_function is None:
             if to is None:
                 raise ValueError("'to' address required for ETH transfers")
