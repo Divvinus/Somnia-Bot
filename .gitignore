@@ -161,18 +161,11 @@ cython_debug/
 #.idea/
 
 # Sensitive data files and text files
-config/data/client/private_keys.txt
-config/data/client/proxies.txt
-config/data/client/auth_tokens_twitter.txt
-config/data/client/auth_tokens_discord.txt
-config/data/client/bad_private_key.txt
-config/data/client/my_refferal_codes.txt
-config/settings.yaml
+# config/data/client
 
 # Database
-db/data_bd/database.db
-db/data_bd/database.db-shm
-db/data_bd/database.db-wal
+data_bd/database.db
+data_bd/database.db-shm
+data_bd/database.db-wal
 
-# Sessions Telegram
-config/data/client/telegram_session/
+config/data/client/bad_private_key.txt

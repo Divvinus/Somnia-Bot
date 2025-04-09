@@ -18,7 +18,7 @@
     <img src="https://img.shields.io/badge/Telegram-Contact-blue?style=for-the-badge&logo=telegram" alt="Telegram Contact">
 </a>
 <br>
-<b>Donations:</b> <code>0x63F78ecCB360516C13Dd48CA3CA3f72eB3D4Fd3e</code>
+<b>Donations:</b> <code>0xDC9FEa6137E2cd29a8B88883FDeb6362147b4c26</code>
 </div>
 
 A multifunctional bot for automating interactions with the Somnia Network testnet. Supports account registration, social media linking, quest completion, and token management.
@@ -32,6 +32,9 @@ A multifunctional bot for automating interactions with the Somnia Network testne
 - Quest completion
   - Somnia Testnet Odyssey - Social
   - Somnia Testnet Odyssey - Sharing is Caring
+  - Darktable x Somnia
+  - Somnia Playground
+  - Somnia Yapstorm
 - Web3 modules
   - Faucet
   - Transfer STT
@@ -41,6 +44,7 @@ A multifunctional bot for automating interactions with the Somnia Network testne
   - Send and mint message nft
   - Deploy token contract
 - Additional modules
+  - Database Management
   - Account statistics monitoring
   - Saving referral codes
 
@@ -79,40 +83,25 @@ pip install -r requirements.txt
 
 ## ⚙️ Configuration
 
-### 1. Configuration Files
+### 1. Structure of configuration files
 
-Create the following files in the `config/data/` directory:
+Create the following files and directories in the `config/data/client/` folder:
 
-#### wallets.txt
-The private key can be with “0x” or without, it does not matter, because the software will automatically make your private keys look properly
-```
-7aa8c1cc3719f7678d...d748f800ba6590
-0х7aa8c1cc3719f7678d...d748f800ba6590
-...
-```
+#### accounts.xlsx
+The file must contain the following columns:
+- `Private Key` (mandatory) - wallet private key
+- `Proxy` (optional) - proxy in `http://user:pass@ip:port` or `socks5://user:pass@ip:port` format
+- `Twitter Token` (optional) - Twitter authorization token
+- `Discord Token` (optional) - Discord token
 
-#### auth_tokens_twitter.txt (for Twitter)
-```
-auth_token1
-auth_token2
-...
-```
-
-#### auth_tokens_discord.txt
-```
-discord_token1
-discord_token2
-...
-```
-
-#### Telegram Sessions
+#### Telegram_session directory
 ```
  Telegram sessions should be named after the private key
  Place in config/data/telegram_sessions/
  Example: 0x123abc...def.session
 ```
 
-#### proxies.txt
+#### Proxy
 The software supports the following types of proxies:
 HTTP/HTTPS and SOCKS5
 ```
@@ -165,40 +154,53 @@ Edit the `config/settings.yaml` file with the following settings:
 
 ```yaml
 #------------------------------------------------------------------------------
-# Threading Configuration
+# en: Threading Configuration
 #------------------------------------------------------------------------------
-# Controls parallel execution capacity (min: 1)
-threads: 10
+# en: Controls parallel execution capacity (min: 1)
+threads: 1
 
 #------------------------------------------------------------------------------
-# Timing Settings
+# en: Timing Settings
 #------------------------------------------------------------------------------
-# Initial delay range before starting operations (seconds)
+# en: Initial delay range before starting operations (seconds)
 delay_before_start:
-    min: 1
-    max: 100
+    min: 10
+    max: 30
 
-
-# Delay between tasks (seconds)
+# en: Delay between tasks (seconds)
 delay_between_tasks:
-    min: 60
+    min: 100
     max: 300
 
 
 #------------------------------------------------------------------------------
-# Telegram API hash and ID
+# en: Telegram API hash and ID | ru: Telegram API hash и ID
 #------------------------------------------------------------------------------
-# Get these values from https://my.telegram.org/apps 
-telegram_api_id: "YOUR_API_ID"
-telegram_api_hash: "YOUR_API_HASH"
+# https://my.telegram.org/apps 
+
+telegram_api_id: ""
+telegram_api_hash: ""
+
+# TELEGRAM DATA
+send_stats_to_telegram: true
+
+tg_token: ""  # https://t.me/BotFather
+tg_id: ""  # https://t.me/getmyid_bot
 
 #------------------------------------------------------------------------------
-# MODULES CONFIGURATION
+# en: MODULES CONFIGURATION
 #------------------------------------------------------------------------------
-# Referral code for standard account registration
-referral_code: "YOUR_REFERRAL_CODE"
+# en: Referral code for standard account registration
+referral_code: ""
 
-Note: For Telegram functionality, you must obtain `api_id` and `api_hash` values from the [Telegram API Development Tools](https://my.telegram.org/apps).
+
+#------------------------------------------------------------------------------
+# en: Task Execution Configuration
+#------------------------------------------------------------------------------
+# en: Tasks that will always run regardless of their status
+always_run_tasks:
+  # en: Module names to always run
+  modules: ["faucet", "mint_message_nft"]
 
 ## 🚀 Launch
 
@@ -217,20 +219,6 @@ After launching the bot, the following options are available:
 6. 📈 View full statistics - View full statistics of the bot
 7. ▶️ Execute route - Execute a selected route
 8. 🚪 Exit - Exit the application
-
-## 🌟 Social Quests
-
-### Quest: "Somnia Testnet Odyssey - Socials"
-- Connect Telegram account
-- Set up username in the system
-- Connect Discord account
-- Follow on Twitter
-- Connect Twitter account
-
-### Quest: "Somnia Testnet Odyssey - Sharing is Caring"
-- Receive STT tokens via transactions
-- Send STT tokens to other users
-- Request tokens from the faucet
 
 ## 🔒 Security Recommendations
 

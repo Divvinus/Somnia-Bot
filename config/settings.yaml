@@ -9,12 +9,12 @@ threads: 10
 #------------------------------------------------------------------------------
 # en: Initial delay range before starting operations (seconds) | ru: Диапазон начальной задержки перед началом выполнения (секунды)
 delay_before_start:
-    min: 1
-    max: 10
+    min: 10
+    max: 30
 
 # en: Delay between tasks (seconds) | ru: Задержка между задачами (секунды)
 delay_between_tasks:
-    min: 60
+    min: 100
     max: 300
 
 
@@ -26,6 +26,11 @@ delay_between_tasks:
 telegram_api_id: ""
 telegram_api_hash: ""
 
+# TELEGRAM DATA
+send_stats_to_telegram: true
+
+tg_token: ""  # https://t.me/BotFather
+tg_id: ""  # https://t.me/getmyid_bot
 
 #------------------------------------------------------------------------------
 # en: MODULES CONFIGURATION  | ru: КОНФИГУРАЦИИ МОДУЛЕЙ
@@ -57,6 +62,7 @@ available_modules:
   - "quest_socials"     # Квест по социальным сетям
   - "quest_sharing"     # Квест по шерингу
   - "quest_darktable"   # Квест по Darktable
+  - "quest_playground"  # Квест по Playground
 
 #------------------------------------------------------------------------------
 # Network Settings
