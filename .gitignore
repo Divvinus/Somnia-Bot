@@ -161,7 +161,7 @@ cython_debug/
 #.idea/
 
 # Sensitive data files and text files
-# config/data/client
+config/data/client
 
 # Database
 data_bd/database.db
