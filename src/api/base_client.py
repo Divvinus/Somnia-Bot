@@ -270,7 +270,7 @@ class BaseAPIClient(AsyncLogger):
                 if attempt < max_retries:
                     delay: float = random.uniform(*retry_delay) * min(2 ** (attempt - 1), 30)
                     
-                    if isinstance(error, (ServerError, SessionRateLimited)):
+                    if isinstance(error, (SessionRateLimited)):
                         await self.logger_msg(
                             msg=f"Server or rate limit error. Retry {attempt}/{max_retries} in {delay:.2f} seconds", 
                             type_msg="debug", method_name="send_request"

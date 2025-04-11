@@ -49,20 +49,23 @@ class QuillsMessageModule(Wallet, AsyncLogger):
     @asynccontextmanager
     async def api_context(self):
         try:
+            if not hasattr(self.api, 'session') or self.api.session is None or self.api.session.closed:
+                await self.api._reset_session_if_needed()
             yield self.api
         finally:
             pass
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.api and hasattr(self.api, "session") and self.api.session and not self.api.session.closed:
-            if hasattr(self.api, "_safely_close_session"):
-                await self.api._safely_close_session(self.api.session)
-            else:
-                await self.api.session.close()
-            self.api.session = None
         pass
     
     async def _process_api_response(self, response: dict, operation_name: str) -> tuple[bool, str]:
+        if not response:
+            await self.logger_msg(
+                msg=f"Empty response during {operation_name}", 
+                type_msg="error", address=self.wallet_address, method_name="_process_api_response"
+            )
+            return False, "Empty response"
+            
         if response.get("data", {}).get("success"):
             await self.logger_msg(
                 msg=f"Successfully {operation_name}", 
@@ -133,6 +136,15 @@ class QuillsMessageModule(Wallet, AsyncLogger):
                         verify=False
                     )
                 
+                if response is None:
+                    await self.logger_msg(
+                        msg=f"Received an empty response from the API (attempt {attempt})", 
+                        type_msg="error", address=self.wallet_address, method_name="mint_message_nft"
+                    )
+                    if attempt < max_attempts:
+                        await random_sleep(self.wallet_address)
+                    continue
+                    
                 status, result = await self._process_api_response(response, f"minted an nft message: {message}")
                 if status:
                     return status, result

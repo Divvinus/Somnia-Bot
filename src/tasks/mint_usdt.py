@@ -12,7 +12,6 @@ class MintUsdtModule(Wallet, AsyncLogger):
     def __init__(self, account: Account, rpc_url: str) -> None:
         Wallet.__init__(self, account.private_key, rpc_url, account.proxy)
         AsyncLogger.__init__(self)
-        self._mint_limit = 1000
         self._contract_address = UsdtTokensContract().address
 
     async def __aenter__(self) -> Self:
@@ -32,12 +31,7 @@ class MintUsdtModule(Wallet, AsyncLogger):
             contract = await self.get_contract(UsdtTokensContract())
             balance = await contract.functions.balanceOf(self.wallet_address).call()
 
-            if balance >= self._mint_limit:
-                await self.logger_msg(
-                    msg=f"Wallet already has {balance} sUSDT",
-                    type_msg="warning",
-                    address=self.wallet_address
-                )
+            if balance > 0:
                 return True, "already_minted"
 
             tx_params = await self.build_transaction_params(

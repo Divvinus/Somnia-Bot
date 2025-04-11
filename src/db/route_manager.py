@@ -26,6 +26,7 @@ class RouteManager:
         "quest_sharing",
         "quest_darktable",
         "quest_playground",
+        "quest_demons",
     ]
 
     DEPENDENCIES: dict[str, list[str]] = {
@@ -41,6 +42,7 @@ class RouteManager:
         "quest_sharing": ["faucet"],
         "quest_darktable": ["profile"],
         "quest_playground": ["profile"],
+        "quest_demons": ["profile"],
     }
     
     @staticmethod

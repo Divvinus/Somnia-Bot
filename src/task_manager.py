@@ -73,3 +73,14 @@ class SomniaBot:
     async def process_quest_playground(account: Account) -> tuple[bool, str]:
         async with QuestPlaygroundModule(account) as module:
             return await module.run()
+        
+    @staticmethod
+    async def process_quest_demons(account: Account) -> tuple[bool, str]:
+        async with QuestDemonsModule(account) as module:
+            return await module.run()
+
+    @staticmethod
+    async def process_quest_gaming_frenzy(account: Account) -> tuple[bool, str]:
+        async with QuestGamingFrenzyModule(account) as module:
+            return await module.run()
+

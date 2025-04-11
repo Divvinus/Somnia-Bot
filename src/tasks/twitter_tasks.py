@@ -1,6 +1,4 @@
 import twitter
-import random
-import asyncio
 
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Self
@@ -59,29 +57,26 @@ class TwitterTasksModule(Wallet, AsyncLogger):
         finally:
             if client:
                 await self.logger_msg(
-                    msg=f"Twitter client connection closed", type_msg="info", 
+                    msg=f"Twitter client connection closed", type_msg="debug", 
                     address=self.wallet_address
                 )
                 
-    async def retweet_tweeet_darktable(self) -> bool:
+    async def retweet_tweeet(self, tweet_id: int) -> bool:
         await self.logger_msg(
-            msg=f"Trying to retweet the post from Darktable", type_msg="info", 
+            msg=f"Trying to retweet the post with ID: {tweet_id}", type_msg="info", 
             address=self.wallet_address
         )
-        tweet_id: int = 1906754535110090831
 
         async with self._get_twitter_client() as client:
             if not client:
                 await self.logger_msg(
                     msg=f"Failed to initialize Twitter client for retweet", type_msg="error", 
-                    address=self.wallet_address, method_name="retweet_tweeet_darktable"
+                    address=self.wallet_address, method_name="retweet_tweeet"
                 )
                 return False
 
             for attempt in range(3):
                 try:
-                    await asyncio.sleep(random.uniform(2, 5))
-
                     query_id = client._ACTION_TO_QUERY_ID['CreateRetweet']
                     url = f"{client._GRAPHQL_URL}/{query_id}/CreateRetweet"
                     
@@ -117,13 +112,94 @@ class TwitterTasksModule(Wallet, AsyncLogger):
                 except Exception as outer_error:
                     await self.logger_msg(
                         msg=f"Unexpected error: {outer_error}", type_msg="error", 
-                        address=self.wallet_address, method_name="retweet_tweeet_darktable"
+                        address=self.wallet_address, method_name="retweet_tweeet"
                     )
                     if attempt == 2:
                         return False
 
             await self.logger_msg(
-                msg=f"Failed to retweet a tweet from Darktable even after three attempts", type_msg="error", 
-                address=self.wallet_address, method_name="retweet_tweeet_darktable"
+                msg=f"Failed to retweet a tweet even after three attempts", type_msg="error", 
+                address=self.wallet_address, method_name="retweet_tweeet"
+            )
+            return False
+        
+    async def like_tweet(self, tweet_id: int) -> bool:
+        await self.logger_msg(
+            msg=f"Trying to like the post with ID: {tweet_id}", 
+            type_msg="info", 
+            address=self.wallet_address
+        )
+        
+        async with self._get_twitter_client() as client:
+            if not client:
+                await self.logger_msg(
+                    msg=f"Failed to initialize Twitter client for like", 
+                    type_msg="error", 
+                    address=self.wallet_address, 
+                    method_name="like_tweet"
+                )
+                return False
+
+            for attempt in range(3):
+                try:
+                    query_id = client._ACTION_TO_QUERY_ID.get('FavoriteTweet')
+                    url = f"{client._GRAPHQL_URL}/{query_id}/FavoriteTweet"
+                    
+                    json_payload = {
+                        "variables": {"tweet_id": str(tweet_id)},
+                        "queryId": query_id,
+                    }
+                    
+                    try:
+                        response, data = await client.request("POST", url, json=json_payload)
+                        
+                        if data.get("data", {}).get("favorite_tweet") == "Done":
+                            await self.logger_msg(
+                                msg=f"Successfully liked tweet {tweet_id}", 
+                                type_msg="success", 
+                                address=self.wallet_address
+                            )
+                            return True
+                            
+                    except Exception as api_error:
+                        error_str = str(api_error)
+                        if "139" in error_str or "Already favorited" in error_str:
+                            await self.logger_msg(
+                                msg=f"Tweet already liked", 
+                                type_msg="success", 
+                                address=self.wallet_address
+                            )
+                            return True
+                        
+                        is_invalid_token = await check_twitter_error_for_invalid_token(
+                            api_error, 
+                            self.account.auth_tokens_twitter, 
+                            self.wallet_address
+                        )
+                        if is_invalid_token:
+                            return False
+
+                        await self.logger_msg(
+                            msg=f"API error: {error_str}", 
+                            type_msg="error", 
+                            address=self.wallet_address, 
+                            method_name="like_tweet"
+                        )
+
+                except Exception as outer_error:
+                    await self.logger_msg(
+                        msg=f"Unexpected error: {outer_error}", 
+                        type_msg="error", 
+                        address=self.wallet_address, 
+                        method_name="like_tweet"
+                    )
+                    if attempt == 2:
+                        return False
+
+            await self.logger_msg(
+                msg=f"Failed to like tweet after 3 attempts", 
+                type_msg="error", 
+                address=self.wallet_address, 
+                method_name="like_tweet"
             )
             return False

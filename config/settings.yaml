@@ -62,7 +62,8 @@ available_modules:
   - "quest_socials"     # Квест по социальным сетям
   - "quest_sharing"     # Квест по шерингу
   - "quest_darktable"   # Квест по Darktable
-  - "quest_playground"  # Квест по Playground
+  - "quest_playground"  # Квест по Playground 
+  - "quest_demons"      # Квест по Demons
 
 #------------------------------------------------------------------------------
 # Network Settings
