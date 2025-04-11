@@ -6,13 +6,12 @@ from config.settings import sleep_between_tasks
 from src.api import SomniaClient
 from src.tasks import (
     ProfileModule, 
-    TransferSTTModule, 
-    TwitterTasksModule
+    TransferSTTModule
 )
 from bot_loader import config
 from src.logger import AsyncLogger
 from src.models import Account
-from src.utils import random_sleep
+from src.utils import random_sleep, TwitterWorker
 
 
 @dataclass
@@ -402,7 +401,7 @@ class QuestDarktableModule(BaseQuestModule):
             msg=f'Processing "Retweet"', type_msg="info", address=self.wallet_address
         )
         
-        async with TwitterTasksModule(self.account) as twitter_module:
+        async with TwitterWorker(self.account) as twitter_module:
             tweet_id=1906754535110090831
 
             result_retweet = await twitter_module.retweet_tweeet(tweet_id)
@@ -542,7 +541,7 @@ class QuestDemonsModule(BaseQuestModule):
             msg=f'Processing "Retweet"', type_msg="info", address=self.wallet_address
         )
         
-        async with TwitterTasksModule(self.account) as twitter_module:
+        async with TwitterWorker(self.account) as twitter_module:
             tweet_id=1909999965046296577
             
             result_retweet = await twitter_module.retweet_tweeet(tweet_id)
@@ -603,7 +602,7 @@ class QuestGamingFrenzyModule(BaseQuestModule):
             msg=f'Processing "Retweet one post"', type_msg="info", address=self.wallet_address
         )
         
-        async with TwitterTasksModule(self.account) as twitter_module:
+        async with TwitterWorker(self.account) as twitter_module:
             tweet_id=1884319440684343507
 
             result_retweet = await twitter_module.retweet_tweeet(tweet_id)
@@ -663,7 +662,7 @@ class QuestGamingFrenzyModule(BaseQuestModule):
             msg=f'Processing "Retweet one post"', type_msg="info", address=self.wallet_address
         )
         
-        async with TwitterTasksModule(self.account) as twitter_module:
+        async with TwitterWorker(self.account) as twitter_module:
             tweet_id=1885339274343551279
 
             result_retweet = await twitter_module.retweet_tweeet(tweet_id)

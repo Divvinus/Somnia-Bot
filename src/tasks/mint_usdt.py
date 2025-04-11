@@ -2,7 +2,6 @@ from typing import Self
 from web3.exceptions import ContractLogicError, TransactionNotFound
 
 from src.wallet import Wallet
-from bot_loader import config
 from src.logger import AsyncLogger
 from src.models import Account, UsdtTokensContract
 from src.utils.logger_trx import show_trx_log
@@ -83,8 +82,7 @@ class MintUsdtModule(Wallet, AsyncLogger):
                 self.wallet_address,
                 "Mint 1000 sUSDT",
                 status,
-                result,
-                config.somnia_explorer
+                result
             )
             
             return status, "Success" if status else result

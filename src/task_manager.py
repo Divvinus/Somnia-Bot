@@ -48,11 +48,6 @@ class SomniaBot:
     async def process_mint_message_nft(account: Account) -> tuple[bool, str]:
         async with QuillsMessageModule(account) as module:
             return await module.run()
-
-    @staticmethod
-    async def process_deploy_token_contract(account: Account) -> tuple[bool, str]:
-        async with QuillsDeployContractModule(account) as module:
-            return await module.run()
     
     @staticmethod
     async def process_quest_socials(account: Account) -> tuple[bool, str]:
@@ -84,3 +79,22 @@ class SomniaBot:
         async with QuestGamingFrenzyModule(account) as module:
             return await module.run()
 
+    @staticmethod
+    async def process_mint_air(account: Account) -> tuple[bool, str]:
+        async with MintairDeployContractModule(account) as module:
+            return await module.run()
+
+    @staticmethod
+    async def process_onchain_gm(account: Account) -> tuple[bool, str]:
+        async with OnchainGMModule(account) as module:
+            return await module.run()
+
+    @staticmethod
+    async def process_yappers_nft(account: Account) -> tuple[bool, str]:
+        async with YappersNFTModule(account) as module:
+            return await module.run()
+        
+    @staticmethod
+    async def process_shannon_nft(account: Account) -> tuple[bool, str]:
+        async with ShannonNFTModule(account) as module:
+            return await module.run()

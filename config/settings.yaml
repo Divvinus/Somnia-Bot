@@ -46,7 +46,7 @@ referral_code: ""
 # ru: Задачи, которые будут выполняться всегда, независимо от их статуса
 always_run_tasks:
   # en: Module names to always run | ru: Имена модулей, задачи которых нужно выполнять всегда
-  modules: ["faucet", "mint_message_nft"]  # пример: ["faucet", "profile"]
+  modules: ["faucet", "mint_message_nft", "mint_air", "onchain_gm"]
 
 # en: Available module names (copy needed modules to the list above)
 # ru: Доступные имена модулей (скопируйте нужные модули в список выше)
@@ -58,12 +58,17 @@ available_modules:
   - "swap_ping_pong"    # Обмен Ping/Pong
   - "mint_usdt"         # Минт USDT
   - "mint_message_nft"  # Минт NFT сообщения
-  - "deploy_token_contract"  # Деплой контракта токена
+  - "mint_air"          # Минт контракта токена
   - "quest_socials"     # Квест по социальным сетям
   - "quest_sharing"     # Квест по шерингу
   - "quest_darktable"   # Квест по Darktable
   - "quest_playground"  # Квест по Playground 
   - "quest_demons"      # Квест по Demons
+  - "quest_gaming_frenzy" # Квест по Gaming Frenzy
+  - "onchain_gm"        # Onchain GM
+  - "shannon_nft"       # Shannon NFT
+  - "yappers_nft"       # Yappers NFT
+
 
 #------------------------------------------------------------------------------
 # Network Settings

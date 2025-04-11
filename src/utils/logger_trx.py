@@ -6,14 +6,15 @@ async def show_trx_log(
     address: str,
     trx_type: str,
     status: bool,
-    result: Union[str, dict, Exception],
-    explorer_url: str = "Developer didn't specify explorer_url"
+    result: Union[str, dict, Exception]
 ) -> None:
+    from bot_loader import config 
+    
     logger = AsyncLogger()
     
     if status:
         tx_hash = _normalize_hash(result)
-        explorer_link = f"{explorer_url.rstrip('/')}/tx/{tx_hash}"
+        explorer_link = f"{config.somnia_explorer.rstrip('/')}/tx/{tx_hash}"
         await logger.logger_msg(
             f"Transaction Type: {trx_type}. Explorer: {explorer_link}",
             type_msg="success", address=address

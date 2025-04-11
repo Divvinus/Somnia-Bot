@@ -18,12 +18,11 @@
     <img src="https://img.shields.io/badge/Telegram-Contact-blue?style=for-the-badge&logo=telegram" alt="Telegram Contact">
 </a>
 <br>
-<b>Donations:</b> <code>0xDC9FEa6137E2cd29a8B88883FDeb6362147b4c26</code>
+<b>A multifunctional bot for automating interactions with the Somnia Network testnet</b>
 </div>
 
-A multifunctional bot for automating interactions with the Somnia Network testnet. Supports account registration, social media linking, quest completion, and token management.
 
-## 🚀 Key Features
+## 🚀 Tasks that Somnia Bot performs
 
 - Automatic account registration and setup
   - Username creation and linking
@@ -34,7 +33,8 @@ A multifunctional bot for automating interactions with the Somnia Network testne
   - Somnia Testnet Odyssey - Sharing is Caring
   - Darktable x Somnia
   - Somnia Playground
-  - Somnia Yapstorm
+  - Netherak Demons
+  - Quest Gaming Frenzy
 - Web3 modules
   - Faucet
   - Transfer STT
@@ -42,17 +42,23 @@ A multifunctional bot for automating interactions with the Somnia Network testne
   - Swap $Ping and $Pong
   - Mint $sUSDT
   - Send and mint message nft
-  - Deploy token contract
+  - Deploy token contract (Mintair)
+  - Onchain GM
+  - Shannon NFT
+  - Yappers NFT
 - Additional modules
   - Database Management
   - Account statistics monitoring
   - Saving referral codes
 
-## 🌐 Supported Networks
-
-- Somnia Network Testnet
-- Supports multiple wallets and proxy configurations
-- Compatible with EVM-based blockchain interactions
+## 🍀 Benefits:
+  - Automatic filtering of invalid addresses
+  - Automatic deletion of invalid data and saving it in separate files
+  - Automatic generation of unique routes
+  - Control of recent interactions to limit spam that can lead to clustering
+  - Detailed statistics on each action and account
+  - Automatic sending of statistics to Telegram
+  - Comfortable customization of all user data in one xlsx file
 
 ## 📋 System Requirements
 

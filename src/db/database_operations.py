@@ -99,7 +99,7 @@ class OptimizedDatabase(Database):
                         
                 elif module in (always_run_modules or []):
                     should_run = False
-                    required_hours = 24 if module == "faucet" else 1
+                    required_hours = 24 if module in ("faucet", "onchain_gm") else 1
                     min_interval = timedelta(hours=required_hours)
 
                     if task_data["last_executed"] is None:
@@ -123,7 +123,12 @@ class OptimizedDatabase(Database):
                                 hours_left = int(total_seconds // 3600)
                                 minutes_left = int((total_seconds % 3600) // 60)
                                 
-                                module_name = "Crane" if module == "faucet" else module.capitalize()
+                                module_display_names = {
+                                    "faucet": "Faucet", 
+                                    "onchain_gm": "Onchain GM", 
+                                }
+                                module_name = module_display_names.get(module, module.capitalize())
+                                
                                 await OptimizedDatabase.logger.logger_msg(
                                     msg=f"{module_name} for account {route_name} will be available in "
                                     f"{hours_left} hours {minutes_left} minutes", 

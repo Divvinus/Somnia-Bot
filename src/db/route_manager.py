@@ -21,12 +21,16 @@ class RouteManager:
         "swap_ping_pong",
         "mint_usdt",
         "mint_message_nft",
-        "deploy_token_contract",
+        "mint_air",
         "quest_socials",
         "quest_sharing",
         "quest_darktable",
         "quest_playground",
         "quest_demons",
+        "quest_gaming_frenzy",
+        "onchain_gm",
+        "shannon_nft",
+        "yappers_nft",
     ]
 
     DEPENDENCIES: dict[str, list[str]] = {
@@ -37,12 +41,16 @@ class RouteManager:
         "transfer_stt": ["faucet"],
         "mint_usdt": ["faucet"],
         "mint_message_nft": ["faucet"],
-        "deploy_token_contract": ["faucet"],
+        "mint_air": ["faucet"],
         "quest_socials": ["profile"],
         "quest_sharing": ["faucet"],
         "quest_darktable": ["profile"],
         "quest_playground": ["profile"],
         "quest_demons": ["profile"],
+        "quest_gaming_frenzy": ["profile"],
+        "onchain_gm": ["faucet"],
+        "shannon_nft": ["faucet"],
+        "yappers_nft": ["faucet"],
     }
     
     @staticmethod

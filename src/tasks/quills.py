@@ -3,12 +3,11 @@ import time
 from faker import Faker
 from contextlib import asynccontextmanager
 
-from bot_loader import config
 from src.logger import AsyncLogger
 from src.api import BaseAPIClient
 from src.wallet import Wallet
-from src.models import Account, ERC20Contract
-from src.utils import show_trx_log, ContractGeneratorData, random_sleep
+from src.models import Account
+from src.utils import random_sleep
 
 
 def _get_headers() -> dict[str, str]:
@@ -175,98 +174,3 @@ class QuillsMessageModule(Wallet, AsyncLogger):
             return False, "Failed to authorize on the site quills.fun"
         
         return await self.mint_message_nft()
-    
-
-class QuillsDeployContractModule(Wallet, AsyncLogger):
-    def __init__(self, account: Account):
-        Wallet.__init__(
-            self, 
-            account.private_key, 
-            config.somnia_rpc, 
-            account.proxy
-        )
-        AsyncLogger.__init__(self)
-        
-        self.fake = Faker()
-        self.erc20_contract = ERC20Contract()
-        self.explorer_url = config.somnia_explorer
-        
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await super().__aexit__(exc_type, exc_val, exc_tb)
-        
-    async def deploy_contract(self) -> tuple[bool, str]:        
-        generator = ContractGeneratorData()
-        token_details = generator.generate_token_details()
-        name = token_details['token_name']
-        symbol = token_details['token_symbol']
-        total_supply = token_details['total_supply']
-        decimals = 18
-        initial_supply_wei = total_supply * 10**decimals
-
-        await self.logger_msg(
-            msg=f"Preparing to deploy a contract {name} ({symbol})", 
-            type_msg="info", address=self.wallet_address
-        )
-        
-        abi = await self.erc20_contract.get_abi()
-        bytecode = await self.erc20_contract.get_bytecode()
-        contract = self.eth.contract(abi=abi, bytecode=bytecode)
-
-        deploy_tx = await contract.constructor(name, symbol, initial_supply_wei).build_transaction({
-            'from': self.wallet_address,
-            'nonce': await self.get_nonce(),
-            'gasPrice': await self.eth.gas_price,
-        })
-
-        gas_estimate = await self.eth.estimate_gas(deploy_tx)
-        deploy_tx['gas'] = int(gas_estimate * 1.2)
-        
-        result, tx_hash = await self.send_and_verify_transaction(deploy_tx)
-        
-        if result:
-            receipt = await self.eth.wait_for_transaction_receipt(tx_hash)
-            deployed_address = receipt['contractAddress']
-            await self.logger_msg(
-                msg=f"Contract deployed successfully at address: {deployed_address}", 
-                type_msg="success", address=self.wallet_address
-            )
-            return result, tx_hash
-        else:
-            await self.logger_msg(
-                msg=f"Error deploying contract", type_msg="error",
-                address=self.wallet_address, method_name="deploy_contract"
-            )
-            return result, tx_hash
-
-    async def run(self):
-        await self.logger_msg(
-            msg=f"Beginning the contract deployment process...", 
-            type_msg="info", address=self.wallet_address
-        )
-        try:            
-            status, result = await self.deploy_contract()
-            
-            await show_trx_log(
-                address=self.wallet_address,
-                trx_type="Deploy ERC20 Contract",
-                status=status,
-                result=result,
-                explorer_url=self.explorer_url
-            )
-            return status, result
-            
-        except (ValueError, ConnectionError) as e:
-            await self.logger_msg(
-                msg=f"Error during contract deployment: {str(e)}", 
-                type_msg="error", address=self.wallet_address, method_name="run"
-            )
-            return False, str(e)
-        except Exception as e:
-            await self.logger_msg(
-                msg=f"Unexpected error: {str(e)}", 
-                type_msg="error", address=self.wallet_address, method_name="run"
-            )
-            return False, str(e)

@@ -1,0 +1,52 @@
+[
+    {
+        "inputs": [
+            {
+                "name": "recipient",
+                "type": "address"
+            },
+            {
+                "name": "amount",
+                "type": "uint256"
+            },
+            {
+                "name": "token",
+                "type": "address"
+            },
+            {
+                "name": "deadline",
+                "type": "uint256"
+            },
+            {
+                "name": "permit",
+                "type": "tuple",
+                "components": [
+                    {
+                        "name": "permitData",
+                        "type": "bytes32[]"
+                    },
+                    {
+                        "name": "permitAmount",
+                        "type": "uint256"
+                    },
+                    {
+                        "name": "permitDeadline",
+                        "type": "uint256"
+                    },
+                    {
+                        "name": "permitToken",
+                        "type": "address"
+                    }
+                ]
+            },
+            {
+                "name": "signature",
+                "type": "bytes"
+            }
+        ],
+        "name": "claim",
+        "outputs": [],
+        "stateMutability": "payable",
+        "type": "function"
+    }
+]

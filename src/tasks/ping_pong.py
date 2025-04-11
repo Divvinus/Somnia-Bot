@@ -82,8 +82,7 @@ class MintPingPongModule(Wallet, AsyncLogger):
                     self.wallet_address,
                     f"Mint {token_name}",
                     status,
-                    result,
-                    config.somnia_explorer,
+                    result
                 )
 
             if status:
@@ -240,8 +239,7 @@ class SwapPingPongModule(Wallet, AsyncLogger):
                     self.wallet_address,
                     f"Swap {token_in_name} to {token_out_name}",
                     status,
-                    result,
-                    config.somnia_explorer,
+                    result
                 )
 
             if status:

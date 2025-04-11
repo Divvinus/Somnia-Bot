@@ -73,8 +73,7 @@ class TransferSTTModule(Wallet, AsyncLogger):
                 self.wallet_address,
                 f"Transfer {amount} STT to {to_address}",
                 status,
-                tx_hash,
-                config.somnia_explorer,
+                tx_hash
             )
 
             return (True, tx_hash) if status else (False, f"Transaction failed: {tx_hash}")

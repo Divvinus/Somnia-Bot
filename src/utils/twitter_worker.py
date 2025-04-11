@@ -9,7 +9,7 @@ from src.logger import AsyncLogger
 from src.utils import check_twitter_error_for_invalid_token
 
 
-class TwitterTasksModule(Wallet, AsyncLogger):
+class TwitterWorker(Wallet, AsyncLogger):
     def __init__(self, account: Account) -> None:
         Wallet.__init__(self, account.private_key, account.proxy)
         AsyncLogger.__init__(self)

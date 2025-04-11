@@ -4,8 +4,7 @@ from .transfer_stt import TransferSTTModule
 from src.api.somnia_client import SomniaClient
 from .ping_pong import MintPingPongModule, SwapPingPongModule
 from .mint_usdt import MintUsdtModule
-from .twitter_tasks import TwitterTasksModule
-from .quills import QuillsMessageModule, QuillsDeployContractModule
+from .quills import QuillsMessageModule
 from .quets import (
     QuestSharingModule,
     QuestSocialsModule, 
@@ -14,3 +13,6 @@ from .quets import (
     QuestDemonsModule,
     QuestGamingFrenzyModule
 )
+from .mintair import MintairDeployContractModule
+from .onchaingm import OnchainGMModule
+from .mint_nft import YappersNFTModule, ShannonNFTModule

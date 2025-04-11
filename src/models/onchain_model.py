@@ -119,3 +119,17 @@ class PongTokensContract(BaseContract):
 class UsdtTokensContract(BaseContract):
     address: str = AsyncWeb3.to_checksum_address("0x65296738d4e5edb1515e40287b6fdf8320e6ee04")
     abi_file: str = "mint_tokens.json"
+    
+@dataclass(slots=True)
+class OnchainGMContract(BaseContract):
+    address: str = AsyncWeb3.to_checksum_address("0xA0692f67ffcEd633f9c5CfAefd83FC4F21973D01")
+
+@dataclass(slots=True)
+class YappersNFTContract(BaseContract):
+    address: str = AsyncWeb3.to_checksum_address("0xF6e220FA8d944B512e9ef2b1d732C3a12F156B3c")
+    abi_file: str = "claim_nft.json"
+    
+@dataclass(slots=True)
+class ShannonNFTContract(BaseContract):
+    address: str = AsyncWeb3.to_checksum_address("0x715A73f6C71aB9cB32c7Cc1Aa95967a1b5da468D")
+    abi_file: str = "claim_nft.json"
