@@ -132,7 +132,7 @@ class ConfigLoader:
                 proxy = Proxy.from_str(str(proxy_str).strip())
                 
             session_path = (
-                telegram_session_dir / private_key 
+                telegram_session_dir / f"{private_key}.session" 
                 if telegram_session_exists 
                 else None
             )

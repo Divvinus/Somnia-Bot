@@ -470,7 +470,6 @@ class ModuleProcessor(AsyncLogger):
         return messages
 
     async def execute(self) -> bool:
-        await self.init_database()
         self.console.build()
         match config.module:
             case "exit":
@@ -489,6 +488,7 @@ class ModuleProcessor(AsyncLogger):
                 await self.process_view_routes()
                 return False
             case "generate_routes":
+                await self.init_database()
                 await RouteManager.create_routes_for_all_accounts(config.accounts)
                 return False
             case "execute_route":

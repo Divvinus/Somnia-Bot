@@ -2,7 +2,7 @@ import asyncio
 import os
 import sys
 
-from bot_loader import config, progress
+from bot_loader import progress
 from src.db import Database
 from module_processor import ModuleProcessor
 from src.logger import AsyncLogger
@@ -13,8 +13,6 @@ async def main_loop() -> None:
     await logger.logger_msg("✅ Program start", type_msg="info")
     
     try:
-        await Database.init_db()
-        await Database.sync_accounts(config.accounts)
         await logger.logger_msg("✅ Database initialized", type_msg="success")
     except Exception as e:
         await logger.logger_msg(f"❌ Database init error: {str(e)}", type_msg="error", method_name="main_loop")
