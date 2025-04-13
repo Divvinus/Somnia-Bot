@@ -161,8 +161,7 @@ async def save_bad_twitter_token(twitter_token: str, wallet_address: str = None)
 async def check_twitter_error_for_invalid_token(error_message: str, twitter_token: str, wallet_address: str) -> bool:
     error_str = str(error_message).lower()
     auth_error_keywords = [
-        "auth", "token", "unauthorized", "invalid token", "expired", 
-        "authentication", "login", "credentials", "401", "403"
+        "invalid token",  "401", "403"
     ]
     
     if any(keyword in error_str for keyword in auth_error_keywords):
