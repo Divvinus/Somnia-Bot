@@ -449,10 +449,6 @@ class ProfileModule(SomniaClient, AsyncLogger):
 
             if error_messages:
                 combined_error = "; ".join(error_messages)
-                await self.logger_msg(
-                    msg=f"Profile setup completed with errors: {combined_error}", 
-                    type_msg="error", address=self.wallet_address, method_name="run"
-                )
                 return True, combined_error
             else:
                 await self.logger_msg(
