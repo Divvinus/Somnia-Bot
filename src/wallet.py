@@ -236,10 +236,6 @@ class Wallet(AsyncWeb3, Account):
                 
             return tx_params
         except Exception as error:
-            await logger.logger_msg(
-                msg=f"Gas estimation failed: {error}", type_msg="error", 
-                class_name=self.__class__.__name__, method_name="_estimate_gas_params"
-            )
             raise BlockchainError(f"Failed to estimate gas: {error}") from error
 
     async def build_transaction_params(

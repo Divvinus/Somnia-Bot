@@ -1,5 +1,7 @@
 from typing import Self
 
+from datetime import datetime, timezone
+
 from src.api import BaseAPIClient
 from src.wallet import Wallet
 from src.logger import AsyncLogger
@@ -42,6 +44,35 @@ class MintairDeployContractModule(Wallet, AsyncLogger):
             'wallet-address': self.wallet_address,
         }
     
+    async def check_daily_streak(self) -> bool:
+        await self.logger_msg(
+            msg=f"Checking to see if we can do 'Daily Streak'", 
+            type_msg="info", 
+            address=self.wallet_address
+        )
+        
+        response = await self.api_client.send_request(
+            request_type="GET",
+            method="/v1/user/streak",
+            headers=self._get_headers()
+        )
+        
+        response_data = response.get("data", {})
+        
+        streak_data = response_data.get('data', {}).get('streak')
+        updated_at_str = streak_data.get('updatedAt')
+        
+        if not updated_at_str:
+            return True
+        
+        updated_at = datetime.strptime(updated_at_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+        
+        current_time = datetime.now(timezone.utc)
+        
+        time_difference = current_time - updated_at
+        
+        return time_difference.total_seconds() >= 24 * 3600
+        
     async def daily_streak(self, transaction_hash: str) -> dict[str, str]:
         await self.logger_msg(
             msg=f"Send a request to the 'Daily Streak'", 
@@ -86,6 +117,14 @@ class MintairDeployContractModule(Wallet, AsyncLogger):
             type_msg="info", 
             address=self.wallet_address
         )
+        
+        if not await self.check_daily_streak():
+            await self.logger_msg(
+                msg="Waiting 24 hours",
+                type_msg="info",
+                address=self.wallet_address
+            )
+            return True, "Waiting 24 hours"
         
         try:
             await self.logger_msg(

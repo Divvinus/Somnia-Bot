@@ -223,7 +223,7 @@ class OptimizedDatabase(Database):
 
     @classmethod
     async def create_route(
-        cls, private_key: str, route_name: str, modules: list[str]
+        cls, private_key: str, route_name: str, modules: list[str], preserve_status: bool = True
     ) -> None:
         address = get_address(private_key)
         async with cls._db_write_semaphore:
@@ -234,22 +234,41 @@ class OptimizedDatabase(Database):
                         (private_key, address),
                     )
 
-                    route_json = orjson.dumps(modules)
-                    await conn.execute(
-                        """
-                        INSERT INTO routes (name, route, status) VALUES (?, ?, 'pending')
-                        ON CONFLICT(name) DO UPDATE SET route = excluded.route,
-                        status = 'pending'
-                        """,
-                        (address, route_json),
+                    cursor = await conn.execute(
+                        "SELECT name, status FROM routes WHERE name = ?", (address,)
                     )
+                    existing_route = await cursor.fetchone()
+                    
+                    route_json = orjson.dumps(modules)
+                    
+                    if existing_route and preserve_status:
+                        await conn.execute(
+                            """
+                            UPDATE routes SET route = ? WHERE name = ?
+                            """,
+                            (route_json, address),
+                        )
+                        await OptimizedDatabase.logger.logger_msg(
+                            msg=f"Route updated while preserving status", 
+                            type_msg="info", method_name="create_route"
+                        )
+                    else:
+                        # Create new route or update and reset status
+                        await conn.execute(
+                            """
+                            INSERT INTO routes (name, route, status) VALUES (?, ?, 'pending')
+                            ON CONFLICT(name) DO UPDATE SET route = excluded.route,
+                            status = 'pending'
+                            """,
+                            (address, route_json),
+                        )
 
                     for module in modules:
                         await conn.execute(
                             """
                             INSERT INTO statistics_tasks (name, module_name, status)
                             VALUES (?, ?, 'pending')
-                            ON CONFLICT(name, module_name) DO UPDATE SET status = 'pending'
+                            ON CONFLICT(name, module_name) DO NOTHING
                             """,
                             (address, module),
                         )
@@ -264,41 +283,46 @@ class OptimizedDatabase(Database):
     async def get_route_stats(cls) -> list[RouteStats]:
         conn = await cls._get_connection()
         try:
-            async with await conn.execute(
-                """
-                SELECT
-                    r.name,
-                    r.name as route_name,
-                    a.private_key,
-                    r.status,
-                    COUNT(st.id) as total_tasks,
-                    SUM(CASE WHEN st.status = 'success' THEN 1 ELSE 0 END)
-                    as success_tasks,
-                    SUM(CASE WHEN st.status = 'failed' THEN 1 ELSE 0 END)
-                    as failed_tasks,
-                    SUM(CASE WHEN st.status = 'pending' THEN 1 ELSE 0 END)
-                    as pending_tasks
-                FROM routes r
-                JOIN accounts a ON r.name = a.address
-                LEFT JOIN statistics_tasks st ON st.name = r.name
-                GROUP BY r.name, a.private_key, r.status
-                ORDER BY r.name
-                """
-            ) as cursor:
-                routes = [
-                    RouteStats(
-                        id=row["name"],
-                        route_name=row["route_name"],
-                        private_key=row["private_key"],
-                        status=row["status"],
-                        total_tasks=row["total_tasks"] or 0,
-                        success_tasks=row["success_tasks"] or 0,
-                        failed_tasks=row["failed_tasks"] or 0,
-                        pending_tasks=row["pending_tasks"] or 0,
-                    )
-                    for row in await cursor.fetchall()
-                ]
-                return routes
+            try:
+                async with await conn.execute(
+                    """
+                    SELECT
+                        r.name,
+                        r.name as route_name,
+                        a.private_key,
+                        r.status,
+                        COUNT(st.id) as total_tasks,
+                        SUM(CASE WHEN st.status = 'success' THEN 1 ELSE 0 END)
+                        as success_tasks,
+                        SUM(CASE WHEN st.status = 'failed' THEN 1 ELSE 0 END)
+                        as failed_tasks,
+                        SUM(CASE WHEN st.status = 'pending' THEN 1 ELSE 0 END)
+                        as pending_tasks
+                    FROM routes r
+                    JOIN accounts a ON r.name = a.address
+                    LEFT JOIN statistics_tasks st ON st.name = r.name
+                    GROUP BY r.name, a.private_key, r.status
+                    ORDER BY r.name
+                    """
+                ) as cursor:
+                    routes = [
+                        RouteStats(
+                            id=row["name"],
+                            route_name=row["route_name"],
+                            private_key=row["private_key"],
+                            status=row["status"],
+                            total_tasks=row["total_tasks"] or 0,
+                            success_tasks=row["success_tasks"] or 0,
+                            failed_tasks=row["failed_tasks"] or 0,
+                            pending_tasks=row["pending_tasks"] or 0,
+                        )
+                        for row in await cursor.fetchall()
+                    ]
+                    return routes
+            except aiosqlite.OperationalError as e:
+                if "no such table" in str(e):
+                    raise DatabaseError(f"Database not initialized: {str(e)}")
+                raise
         except aiosqlite.Error as e:
             await OptimizedDatabase.logger.logger_msg(
                 msg=f"Failed to get route statistics: {str(e)}", 
@@ -314,102 +338,107 @@ class OptimizedDatabase(Database):
     ) -> tuple[list[AccountStatistics], SummaryStatistics]:
         conn = await cls._get_connection()
         try:
-            async with await conn.execute(
-                """
-                SELECT
-                    a.address,
-                    a.private_key,
-                    sa.percentage_completed,
-                    COUNT(st.id) as total_tasks,
-                    SUM(CASE WHEN st.status = 'success' THEN 1 ELSE 0 END)
-                    as completed_tasks,
-                    SUM(CASE WHEN st.status = 'failed' THEN 1 ELSE 0 END)
-                    as failed_tasks,
-                    SUM(CASE WHEN st.status = 'pending' THEN 1 ELSE 0 END)
-                    as pending_tasks
-                FROM accounts a
-                LEFT JOIN statistics_account sa ON a.address = sa.name
-                LEFT JOIN statistics_tasks st ON a.address = st.name
-                GROUP BY a.address, a.private_key
-                ORDER BY sa.percentage_completed DESC
-                """
-            ) as cursor:
-                accounts_stats = []
-                for row in await cursor.fetchall():
-                    address = row["address"]
-                    async with await conn.execute(
-                        """
-                        SELECT module_name, status, result_message, error_message,
-                        last_executed
-                        FROM statistics_tasks
-                        WHERE name = ?
-                        ORDER BY module_name
-                        """,
-                        (address,),
-                    ) as task_cursor:
-                        task_details = [dict(task) async for task in task_cursor]
-                    accounts_stats.append(
-                        AccountStatistics(
-                            address=address,
-                            private_key=row["private_key"],
-                            total_tasks=row["total_tasks"] or 0,
-                            completed_tasks=row["completed_tasks"] or 0,
-                            failed_tasks=row["failed_tasks"] or 0,
-                            pending_tasks=row["pending_tasks"] or 0,
-                            percentage_completed=row["percentage_completed"] or 0.0,
-                            task_details=task_details,
+            try:
+                async with await conn.execute(
+                    """
+                    SELECT
+                        a.address,
+                        a.private_key,
+                        sa.percentage_completed,
+                        COUNT(st.id) as total_tasks,
+                        SUM(CASE WHEN st.status = 'success' THEN 1 ELSE 0 END)
+                        as completed_tasks,
+                        SUM(CASE WHEN st.status = 'failed' THEN 1 ELSE 0 END)
+                        as failed_tasks,
+                        SUM(CASE WHEN st.status = 'pending' THEN 1 ELSE 0 END)
+                        as pending_tasks
+                    FROM accounts a
+                    LEFT JOIN statistics_account sa ON a.address = sa.name
+                    LEFT JOIN statistics_tasks st ON a.address = st.name
+                    GROUP BY a.address, a.private_key
+                    ORDER BY sa.percentage_completed DESC
+                    """
+                ) as cursor:
+                    accounts_stats = []
+                    for row in await cursor.fetchall():
+                        address = row["address"]
+                        async with await conn.execute(
+                            """
+                            SELECT module_name, status, result_message, error_message,
+                            last_executed
+                            FROM statistics_tasks
+                            WHERE name = ?
+                            ORDER BY module_name
+                            """,
+                            (address,),
+                        ) as task_cursor:
+                            task_details = [dict(task) async for task in task_cursor]
+                        accounts_stats.append(
+                            AccountStatistics(
+                                address=address,
+                                private_key=row["private_key"],
+                                total_tasks=row["total_tasks"] or 0,
+                                completed_tasks=row["completed_tasks"] or 0,
+                                failed_tasks=row["failed_tasks"] or 0,
+                                pending_tasks=row["pending_tasks"] or 0,
+                                percentage_completed=row["percentage_completed"] or 0.0,
+                                task_details=task_details,
+                            )
                         )
+
+                total_accounts = len(accounts_stats)
+                total_modules = sum(acc.total_tasks for acc in accounts_stats)
+                total_completed = sum(acc.completed_tasks for acc in accounts_stats)
+                total_failed = sum(acc.failed_tasks for acc in accounts_stats)
+                total_pending = sum(acc.pending_tasks for acc in accounts_stats)
+
+                module_errors = {}
+                for acc in accounts_stats:
+                    for task in acc.task_details:
+                        if task["status"] == "failed":
+                            module_name = task["module_name"]
+                            module_errors.setdefault(module_name, {"count": 0, "accounts": []})
+                            module_errors[module_name]["count"] += 1
+                            module_errors[module_name]["accounts"].append(acc.address)
+
+                error_modules = [
+                    ModuleErrorStat(
+                        module_name=module,
+                        error_count=stats["count"],
+                        accounts_affected=stats["accounts"],
                     )
+                    for module, stats in module_errors.items()
+                ]
+                error_modules.sort(key=lambda x: x.error_count, reverse=True)
 
-            total_accounts = len(accounts_stats)
-            total_modules = sum(acc.total_tasks for acc in accounts_stats)
-            total_completed = sum(acc.completed_tasks for acc in accounts_stats)
-            total_failed = sum(acc.failed_tasks for acc in accounts_stats)
-            total_pending = sum(acc.pending_tasks for acc in accounts_stats)
-
-            module_errors = {}
-            for acc in accounts_stats:
-                for task in acc.task_details:
-                    if task["status"] == "failed":
-                        module_name = task["module_name"]
-                        module_errors.setdefault(module_name, {"count": 0, "accounts": []})
-                        module_errors[module_name]["count"] += 1
-                        module_errors[module_name]["accounts"].append(acc.address)
-
-            error_modules = [
-                ModuleErrorStat(
-                    module_name=module,
-                    error_count=stats["count"],
-                    accounts_affected=stats["accounts"],
+                success_percentage = (
+                    (total_completed / total_modules * 100) if total_modules > 0 else 0
                 )
-                for module, stats in module_errors.items()
-            ]
-            error_modules.sort(key=lambda x: x.error_count, reverse=True)
+                failed_percentage = (
+                    (total_failed / total_modules * 100) if total_modules > 0 else 0
+                )
+                pending_percentage = (
+                    (total_pending / total_modules * 100) if total_modules > 0 else 0
+                )
 
-            success_percentage = (
-                (total_completed / total_modules * 100) if total_modules > 0 else 0
-            )
-            failed_percentage = (
-                (total_failed / total_modules * 100) if total_modules > 0 else 0
-            )
-            pending_percentage = (
-                (total_pending / total_modules * 100) if total_modules > 0 else 0
-            )
-
-            summary = SummaryStatistics(
-                total_accounts=total_accounts,
-                success_percentage=success_percentage,
-                failed_percentage=failed_percentage,
-                pending_percentage=pending_percentage,
-                error_modules=error_modules,
-            )
-            return accounts_stats, summary
+                summary = SummaryStatistics(
+                    total_accounts=total_accounts,
+                    success_percentage=success_percentage,
+                    failed_percentage=failed_percentage,
+                    pending_percentage=pending_percentage,
+                    error_modules=error_modules,
+                )
+                return accounts_stats, summary
+            except aiosqlite.OperationalError as e:
+                if "no such table" in str(e):
+                    raise DatabaseError(f"Database not initialized: {str(e)}")
+                raise
         except aiosqlite.Error as e:
             await OptimizedDatabase.logger.logger_msg(
-                msg=f"Failed to retrieve account statistics: {str(e)}", 
+                msg=f"Failed to get account statistics: {str(e)}", 
                 type_msg="error", method_name="get_accounts_statistics"
             )
-            raise DatabaseError(f"Failed to retrieve account statistics: {str(e)}")
+            raise DatabaseError(f"Failed to get account statistics: {str(e)}")
         finally:
             await cls._release_connection(conn)
 

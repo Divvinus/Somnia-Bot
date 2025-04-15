@@ -39,6 +39,8 @@ class BaseQuestModule(SomniaClient, ABC):
 
     @staticmethod
     def get_incomplete_quests(response: dict[str, Any]) -> list[int]:
+        if not response or not isinstance(response, dict):
+            return []
         quests = response.get("data", {}).get("quests", [])
         return [
             quest["id"]
@@ -47,23 +49,39 @@ class BaseQuestModule(SomniaClient, ABC):
         ]
 
     async def get_quests(self) -> dict[str, Any] | bool:
-        if not await self.onboarding():
+        try:
+            if not await self.onboarding():
+                await self.logger.logger_msg(
+                    msg=f"Authorization failed", type_msg="error", 
+                    address=self.wallet_address, class_name=self.__class__.__name__, method_name="get_quests"
+                )
+                return False
+
+            response = await self.send_request(
+                request_type="GET",
+                method=f"/campaigns/{self.quest_config.campaign_id}",
+                headers=self._get_base_headers(
+                    auth=True,
+                    custom_referer=(
+                        f"https://quest.somnia.network/campaigns/{self.quest_config.campaign_id}"
+                    ),
+                ),
+            )
+            
+            if not isinstance(response, dict):
+                await self.logger.logger_msg(
+                    msg=f"Unexpected response type: {type(response)}", type_msg="error", 
+                    address=self.wallet_address, class_name=self.__class__.__name__, method_name="get_quests"
+                )
+                return {}
+            
+            return response
+        except Exception as e:
             await self.logger.logger_msg(
-                msg=f"Authorization failed", type_msg="error", 
+                msg=f"Error in get_quests: {str(e)}", type_msg="error", 
                 address=self.wallet_address, class_name=self.__class__.__name__, method_name="get_quests"
             )
-            return False
-
-        return await self.send_request(
-            request_type="GET",
-            method=f"/campaigns/{self.quest_config.campaign_id}",
-            headers=self._get_base_headers(
-                auth=True,
-                custom_referer=(
-                    f"https://quest.somnia.network/campaigns/{self.quest_config.campaign_id}"
-                ),
-            ),
-        )
+            return {}
 
     async def _process_response(
         self,
@@ -71,21 +89,22 @@ class BaseQuestModule(SomniaClient, ABC):
         success_msg: str,
         error_msg: str,
     ) -> tuple[bool, str | None]:
-        if response.get("status_code") != 200:
+        if response is None or response.get("status_code") != 200:
+            status_code = response.get("status_code", "N/A") if response else "N/A"
             await self.logger.logger_msg(
-                msg=f"{error_msg} | Code: {response.get('status_code')}", type_msg="error", 
+                msg=f"{error_msg} | Code: {status_code}", type_msg="error", 
                 address=self.wallet_address, class_name=self.__class__.__name__, method_name="_process_response"
             )
             return False, "http_error"
 
-        response_data = response.get("data", {})
-        if response_data.get("success"):
+        response_data = response.get("data", {}) if response else {}
+        if response_data and response_data.get("success"):
             await self.logger.logger_msg(
                 msg=f"{success_msg}", type_msg="success", address=self.wallet_address
             )
             return True, success_msg
 
-        error_reason = response_data.get("reason", "")
+        error_reason = response_data.get("reason", "") if response_data else "Unknown error"
         log_msg = f"Account: {self.wallet_address} | {error_msg} | Reason: {error_reason}"
         
         if error_reason == "Verification conditions not met":
@@ -122,6 +141,13 @@ class BaseQuestModule(SomniaClient, ABC):
             class_name = self.__class__.__name__
             quest_name = class_name.replace("Module", "").replace("Quest", "")
             
+            if not self.quest_config or not hasattr(self.quest_config, 'quest_handlers') or not self.quest_config.quest_handlers:
+                await self.logger.logger_msg(
+                    msg=f'Quest: "Somnia Testnet Odyssey - {quest_name}" | No quest handlers defined', 
+                    type_msg="error", address=self.wallet_address, class_name=class_name, method_name="run"
+                )
+                return False, "No quest handlers defined"
+            
             await self.logger.logger_msg(
                 msg=f'Starting quest: "Somnia Testnet Odyssey - {quest_name}" processing...', 
                 type_msg="info", address=self.wallet_address
@@ -145,6 +171,8 @@ class BaseQuestModule(SomniaClient, ABC):
                         msg=f'Quest: "Somnia Testnet Odyssey - {quest_name}" | Failed to get quests data', 
                         type_msg="error", address=self.wallet_address, class_name=class_name, method_name="run"
                     )
+                    if attempt == 3:
+                        return False, "Failed to get quests data"
                     continue
                     
                 incomplete = self.get_incomplete_quests(quests_data)
@@ -171,15 +199,32 @@ class BaseQuestModule(SomniaClient, ABC):
                         
                     handler = getattr(self, handler_name, None)
                     if not handler:
+                        await self.logger.logger_msg(
+                            msg=f'Handler "{handler_name}" not found for quest ID {quest_id}',
+                            type_msg="error", 
+                            address=self.wallet_address,
+                            class_name=class_name, 
+                            method_name="run"
+                        )
                         continue
                         
-                    success, error_code = await handler()
-                    results.append(success)
-                    
-                    if error_code == "conditions_not_met":
-                        excluded_quests.add(quest_id)
-                        if not results:
-                            fatal_error = True
+                    try:
+                        success, error_code = await handler()
+                        results.append(success)
+                        
+                        if error_code == "conditions_not_met":
+                            excluded_quests.add(quest_id)
+                            if not results:
+                                fatal_error = True
+                    except Exception as e:
+                        await self.logger.logger_msg(
+                            msg=f'Error executing handler "{handler_name}": {str(e)}',
+                            type_msg="error", 
+                            address=self.wallet_address,
+                            class_name=class_name, 
+                            method_name="run"
+                        )
+                        continue
 
                 if all(results):
                     await self.logger.logger_msg(
@@ -211,6 +256,22 @@ class BaseQuestModule(SomniaClient, ABC):
                 type_msg="error", address=self.wallet_address, class_name=class_name, method_name="run"
             )
             return False, f"Critical error: {error!s}"
+
+    def safe_quest_handler(handler_func):
+        async def wrapper(self, *args, **kwargs):
+            try:
+                return await handler_func(self, *args, **kwargs)
+            except Exception as e:
+                handler_name = handler_func.__name__
+                await self.logger.logger_msg(
+                    msg=f"Error in {handler_name}: {str(e)}", 
+                    type_msg="error",
+                    address=self.wallet_address, 
+                    class_name=self.__class__.__name__, 
+                    method_name=handler_name
+                )
+                return False, f"Error in {handler_name}: {str(e)}"
+        return wrapper
 
 
 class QuestSharingModule(BaseQuestModule):

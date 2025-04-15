@@ -21,6 +21,15 @@ async def get_database_path() -> str:
     root_dir = os.path.dirname(os.path.dirname(script_dir))
     data_dir = os.path.join(root_dir, "data_bd")
     db_path = os.path.join(data_dir, "database.db")
+    return db_path
+
+@cached()
+async def get_and_ensure_database_path() -> str:
+    """Get database path and ensure the directory exists"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(os.path.dirname(script_dir))
+    data_dir = os.path.join(root_dir, "data_bd")
+    db_path = os.path.join(data_dir, "database.db")
     if not os.path.exists(data_dir):
         try:
             os.makedirs(data_dir, exist_ok=True)
@@ -30,17 +39,16 @@ async def get_database_path() -> str:
         except PermissionError as e:
             await logger.logger_msg(
                 msg=f"Permission error: {str(e)}", type_msg="error", 
-                method_name="get_database_path"
+                method_name="get_and_ensure_database_path"
             )
             raise
         except OSError as e:
             await logger.logger_msg(
                 msg=f"Directory creation failed: {str(e)}", type_msg="error", 
-                method_name="get_database_path"
+                method_name="get_and_ensure_database_path"
             )
             raise
     return db_path
-
 
 class Database:    
     _db_write_semaphore = asyncio.Semaphore(1)
@@ -52,6 +60,10 @@ class Database:
     @classmethod
     async def _create_connection(cls) -> aiosqlite.Connection:
         db_path = await get_database_path()
+        
+        if not os.path.exists(os.path.dirname(db_path)):
+            raise DatabaseError("Database directory does not exist. Please create routes first.")
+        
         try:
             conn = await aiosqlite.connect(
                 database=db_path,
@@ -100,6 +112,7 @@ class Database:
 
     @classmethod
     async def init_db(cls) -> None:
+        db_path = await get_and_ensure_database_path()
         conn = await cls._get_connection()
         try:
             await conn.execute("PRAGMA journal_mode = WAL")
@@ -254,3 +267,7 @@ class Database:
                             class_name=cls.__name__, method_name="sync_accounts"
                         )
                         raise DatabaseError(f"Error inserting records: {str(e)}")
+
+    @classmethod
+    async def get_db_path(cls) -> str:
+        return await get_database_path()

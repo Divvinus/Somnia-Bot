@@ -1,6 +1,7 @@
 import asyncio
 from typing import Callable
 from datetime import datetime
+import os
 
 from src.console import Console
 from src.task_manager import SomniaBot
@@ -12,6 +13,7 @@ from src.logger import AsyncLogger
 from src.models import Account
 from src.utils import get_address, random_sleep
 from src.utils.send_tg_message import SendTgMessage
+from src.db.database_operations import DatabaseError
 
 
 async def process_execution(account: Account, process_func: Callable) -> tuple[bool, str]:
@@ -171,6 +173,23 @@ class ModuleProcessor(AsyncLogger):
             )
 
     async def process_route_execution(self) -> None:
+        try:
+            async with Database.transaction() as conn:
+                await conn.execute("SELECT 1 FROM routes LIMIT 1")
+        except DatabaseError as e:
+            if "no such table" in str(e):
+                await self.logger_msg(
+                    "Database not initialized. Please create routes using 'Generate routes'", 
+                    type_msg="warning"
+                )
+                return
+            else:
+                await self.logger_msg(
+                    f"Error checking database: {str(e)}", type_msg="error",
+                    method_name="process_route_execution"
+                )
+                return
+
         async def process_account(account: Account) -> None:
             address = get_address(account.private_key)
             
@@ -351,7 +370,7 @@ class ModuleProcessor(AsyncLogger):
         try:
             routes_stats = await Database.get_route_stats()
             if not routes_stats:
-                await self.logger_msg("No route statistics found", type_msg="info")
+                await self.logger_msg("No route statistics. Please create routes using 'Generate routes'", type_msg="info")
                 return
             await self.logger_msg("=== Route Statistics ===", type_msg="info")
             for route in routes_stats:
@@ -363,18 +382,24 @@ class ModuleProcessor(AsyncLogger):
                     type_msg="info"
                 )
             await self.logger_msg("=======================\n", type_msg="info")
-        except Exception as e:
-            await self.logger_msg(
-                f"Failed to get route stats: {str(e)}", 
-                type_msg="error",
-                method_name="process_view_routes"
-            )
+        except DatabaseError as e:
+            if "no such table" in str(e):
+                await self.logger_msg(
+                    "Database not initialized. Please create routes using 'Generate routes'", 
+                    type_msg="warning"
+                )
+            else:
+                await self.logger_msg(
+                    f"Failed to get route statistics: {str(e)}", 
+                    type_msg="error",
+                    method_name="process_view_routes"
+                )
 
     async def process_view_statistics(self) -> None:
         try:
             await self.logger_msg("Getting detailed statistics...", type_msg="info")
             accounts_stats, summary = await Database.get_accounts_statistics()
-            await self.logger_msg("\n📊 Detailed statistics by accounts 📊", type_msg="info")
+            await self.logger_msg("\n📊 Detailed account statistics 📊", type_msg="info")
             await self.logger_msg("=" * 100, type_msg="info")
             for i, acc in enumerate(accounts_stats, 1):
                 await self.logger_msg(
@@ -445,12 +470,18 @@ class ModuleProcessor(AsyncLogger):
             else:
                 await self.logger_msg("✨ No modules with errors!", type_msg="info")
             await self.logger_msg("=" * 100, type_msg="info")
-        except Exception as e:
-            await self.logger_msg(
-                f"Error getting statistics: {str(e)}", 
-                type_msg="error",
-                method_name="process_view_statistics"
-            )
+        except DatabaseError as e:
+            if "no such table" in str(e):
+                await self.logger_msg(
+                    "Database not initialized. Please create routes using 'Generate routes'", 
+                    type_msg="warning"
+                )
+            else:
+                await self.logger_msg(
+                    f"Error getting statistics: {str(e)}", 
+                    type_msg="error",
+                    method_name="process_view_statistics"
+                )
 
     async def get_summary_stats_message(self, summary: SummaryStatistics) -> list[str]:
         messages = []
@@ -473,15 +504,24 @@ class ModuleProcessor(AsyncLogger):
         self.console.build()
         match config.module:
             case "exit":
-                await self.logger_msg("🔴 Exiting program...", type_msg="info")
+                await self.logger_msg("🔴 Exit program...", type_msg="info")
                 return True
             case "view_statistics":
-                await self.process_view_statistics()
+                try:
+                    await self.process_view_statistics()
+                except Exception as e:
+                    await self.logger_msg(
+                        f"Error in view_statistics: {str(e)}", type_msg="error",
+                        method_name="execute"
+                    )
 
-                if config.send_stats_to_telegram and config.accounts:
-                    accounts_stats, summary = await Database.get_accounts_statistics()
-                    summary_messages = await self.get_summary_stats_message(summary)
-                    await self.send_stats_to_telegram(config.accounts[0], summary_messages)
+                try:
+                    if config.send_stats_to_telegram and config.accounts:
+                        accounts_stats, summary = await Database.get_accounts_statistics()
+                        summary_messages = await self.get_summary_stats_message(summary)
+                        await self.send_stats_to_telegram(config.accounts[0], summary_messages)
+                except Exception as e:
+                    pass
                 
                 return False
             case "view_routes":
@@ -493,6 +533,32 @@ class ModuleProcessor(AsyncLogger):
                 return False
             case "execute_route":
                 await self.process_route_execution()
+                return False
+            case "update_routes":
+                try:
+                    db_path = await Database.get_db_path()
+                    if not os.path.exists(db_path):
+                        await self.logger_msg(
+                            "Database not found. Please create routes first using 'Generate routes'", 
+                            type_msg="warning"
+                        )
+                        return False
+                    
+                    db_dir = os.path.dirname(db_path)
+                    if not os.path.exists(db_dir):
+                        await self.logger_msg(
+                            "Database directory not found. Please create routes first using 'Generate routes'", 
+                            type_msg="warning"
+                        )
+                        return False
+                    
+                    await RouteManager.update_routes_with_new_modules()
+                except Exception as e:
+                    await self.logger_msg(
+                        f"Error updating routes: {str(e)}", 
+                        type_msg="error",
+                        method_name="execute"
+                    )
                 return False
             case module if module in self.module_functions:
                 async def process_account(account):

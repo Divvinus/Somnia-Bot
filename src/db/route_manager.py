@@ -1,12 +1,15 @@
 import asyncio
 import random
 from collections import defaultdict, deque
+import orjson
+import os
 
 from src.db import Database
 from bot_loader import config
 from src.logger import AsyncLogger
 from src.models import Account
 from src.utils import get_address
+from src.db.database_core import get_database_path
 
 
 class RouteManager:
@@ -178,3 +181,96 @@ class RouteManager:
                     )
 
         await asyncio.gather(*(create_route_task(account) for account in accounts))
+
+    @staticmethod
+    async def update_routes_with_new_modules() -> None:
+        try:
+            db_path = await get_database_path()
+            
+            if not os.path.exists(db_path):
+                await RouteManager.logger.logger_msg(
+                    msg="Database file not found. Please create routes using 'Generate routes'", 
+                    type_msg="warning", 
+                    method_name="update_routes_with_new_modules"
+                )
+                return
+            
+            conn = await Database._get_connection()
+            try:
+                try:
+                    cursor = await conn.execute("SELECT name, route FROM routes")
+                    routes = await cursor.fetchall()
+                except Exception as e:
+                    if "no such table" in str(e):
+                        await RouteManager.logger.logger_msg(
+                            msg="Database not initialized. Please create routes using 'Generate routes'", 
+                            type_msg="warning", 
+                            method_name="update_routes_with_new_modules"
+                        )
+                        return
+                    raise
+            finally:
+                await Database._release_connection(conn)
+            
+            if not routes:
+                await RouteManager.logger.logger_msg(
+                    msg="No existing routes found to update", 
+                    type_msg="warning", 
+                    method_name="update_routes_with_new_modules"
+                )
+                return
+            
+            updated_count = 0
+            for route in routes:
+                route_name = route["name"]
+                existing_modules = orjson.loads(route["route"])
+                
+                new_modules = [m for m in RouteManager.DEFAULT_MODULES if m not in existing_modules]
+                
+                if new_modules:
+                    updated_modules = existing_modules + new_modules
+                    
+                    account_conn = await Database._get_connection()
+                    try:
+                        cursor = await account_conn.execute(
+                            "SELECT private_key FROM accounts WHERE address = ?", 
+                            (route_name,)
+                        )
+                        account_row = await cursor.fetchone()
+                        if not account_row:
+                            await RouteManager.logger.logger_msg(
+                                msg=f"Cannot find account for route: {route_name}", 
+                                type_msg="warning", 
+                                method_name="update_routes_with_new_modules"
+                            )
+                            continue
+                        
+                        private_key = account_row["private_key"]
+                    finally:
+                        await Database._release_connection(account_conn)
+                    
+                    await Database.create_route(
+                        private_key=private_key,
+                        route_name=route_name,
+                        modules=updated_modules,
+                        preserve_status=True
+                    )
+                    updated_count += 1
+                    
+                    await RouteManager.logger.logger_msg(
+                        msg=f"Added {len(new_modules)} new modules to route", 
+                        type_msg="success", 
+                        address=route_name
+                    )
+            
+            await RouteManager.logger.logger_msg(
+                msg=f"Updated {updated_count} routes with new modules", 
+                type_msg="info", 
+                method_name="update_routes_with_new_modules"
+            )
+        except Exception as e:
+            await RouteManager.logger.logger_msg(
+                msg=f"Failed to update routes with new modules: {str(e)}", 
+                type_msg="error", 
+                method_name="update_routes_with_new_modules"
+            )

@@ -49,7 +49,7 @@ class QuillsMessageModule(Wallet, AsyncLogger):
     async def api_context(self):
         try:
             if not hasattr(self.api, 'session') or self.api.session is None or self.api.session.closed:
-                await self.api._reset_session_if_needed()
+                self.api.session = await self.api._get_session()
             yield self.api
         finally:
             pass

@@ -174,9 +174,11 @@ class ProfileModule(SomniaClient, AsyncLogger):
                 self._me_info_cache = None
                 return True, "Successfully connected Telegram account"
             else:
+                status_code = response.get('status_code')
+                error_text = response.get('text', '')
                 await self.logger_msg(
-                    msg=f"Error: {response}", type_msg="error", 
-                    address=self.wallet_address, method_name="connect_telegram_account"
+                    msg=f"Error connecting Telegram: Status {status_code}, Response: {error_text}", 
+                    type_msg="error", address=self.wallet_address, method_name="connect_telegram_account"
                 )
                 return False, "Failed to connect Telegram account"
                     
@@ -221,12 +223,14 @@ class ProfileModule(SomniaClient, AsyncLogger):
                 )
                 self._me_info_cache = None
             else:
+                status_code = response.get('status_code')
+                error_text = response.get('text', '')
                 await self.logger_msg(
-                    msg=f"Error: {response}", type_msg="error", 
-                    address=self.wallet_address, method_name="connect_discord_account"
+                    msg=f"Error connecting Discord: Status {status_code}, Response: {error_text}", 
+                    type_msg="error", address=self.wallet_address, method_name="connect_discord_account"
                 )
 
-            return success, "Successfully connected Discord account"
+            return success, "Successfully connected Discord account" if success else f"Failed to connect Discord account (Status: {response.get('status_code')})"
 
         except Exception as e:
             await self.logger_msg(
@@ -265,23 +269,26 @@ class ProfileModule(SomniaClient, AsyncLogger):
                 verify=False
             )
 
-            success = (
+            result = (
                 response.get('status_code') == 200 
                 and response.get('data', {}).get("success", False)
             )
-            if success:
+            if result:
+                msg = f"Twitter account connected successfully"
                 await self.logger_msg(
-                    msg=f"Twitter account connected successfully", 
+                    msg=msg, 
                     type_msg="success", address=self.wallet_address
                 )
                 self._me_info_cache = None
             else:
+                status_code = response.get('status_code')
+                error_text = response.get('text', '')
                 await self.logger_msg(
-                    msg=f"Error: {response}", 
+                    msg=f"Error connecting Twitter: Status {status_code}, Response: {error_text}", 
                     type_msg="error", address=self.wallet_address, method_name="connect_twitter_account"
                 )
 
-            return success, "Successfully connected Twitter account"
+            return result, msg if result else f"Failed to connect Twitter account (Status: {response.get('status_code')})"
 
         except Exception as e:
             await self.logger_msg(

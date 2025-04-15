@@ -91,7 +91,8 @@ class SomniaClient(Wallet, AsyncLogger):
     async def send_request(self, *args, **kwargs) -> Any:
         if not self._api or (hasattr(self._api, 'session') and 
                             (self._api.session is None or self._api.session.closed)):
-            await self._api._reset_session_if_needed()
+            if self._api:
+                self._api.session = await self._api._get_session()
         return await self.api.send_request(*args, **kwargs)
 
     def _get_base_headers(self, auth: bool = True, custom_referer: Optional[str] = None) -> Dict[str, str]:
@@ -137,7 +138,8 @@ class SomniaClient(Wallet, AsyncLogger):
                 )
                 
                 if response.get("status_code") == 500:
-                    await self.api._reset_session_if_needed() 
+                    if self._api:
+                        self._api.session = await self._api._get_session()
                     continue
                     
                 token = response.get("data").get("token")
@@ -247,7 +249,8 @@ class SomniaClient(Wallet, AsyncLogger):
                     return True, "Successfully activated referral code"
                     
                 if response.get("status_code") == 500:
-                    await self.api._reset_session_if_needed() 
+                    if self._api:
+                        self._api.session = await self._api._get_session()
                     await self.logger_msg(
                         msg=f"Server error, retrying... (attempt {attempt + 1}/{self.config.MAX_RETRIES})", type_msg="warning", 
                         address=self.wallet_address, method_name="activate_referral"
@@ -330,4 +333,4 @@ class SomniaClient(Wallet, AsyncLogger):
             self._api = BaseAPIClient(base_url=self.config.API_URL, proxy=self.account.proxy)
             await self._api.__aenter__()
         elif hasattr(self._api, 'session') and (self._api.session is None or self._api.session.closed):
-            await self._api._reset_session_if_needed()
+            self._api.session = await self._api._get_session()
