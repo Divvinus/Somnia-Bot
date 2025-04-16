@@ -18,7 +18,6 @@ class RouteManager:
 
     DEFAULT_MODULES: list[str] = [
         "profile",
-        "faucet",
         "transfer_stt",
         "mint_ping_pong",
         "swap_ping_pong",
@@ -34,6 +33,9 @@ class RouteManager:
         "onchain_gm",
         "shannon_nft",
         "yappers_nft",
+        "quest_somnia_gaming_room",
+        "mint_domen",
+        "quest_mullet",
     ]
 
     DEPENDENCIES: dict[str, list[str]] = {
@@ -54,6 +56,9 @@ class RouteManager:
         "onchain_gm": ["faucet"],
         "shannon_nft": ["faucet"],
         "yappers_nft": ["faucet"],
+        "quest_somnia_gaming_room": ["profile"],
+        "mint_domen": ["faucet"],
+        "quest_mullet": ["profile"],
     }
     
     @staticmethod
@@ -228,7 +233,7 @@ class RouteManager:
                 new_modules = [m for m in RouteManager.DEFAULT_MODULES if m not in existing_modules]
                 
                 if new_modules:
-                    updated_modules = existing_modules + new_modules
+                    updated_modules = list(dict.fromkeys(existing_modules + new_modules))
                     
                     account_conn = await Database._get_connection()
                     try:

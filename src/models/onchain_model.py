@@ -133,3 +133,8 @@ class YappersNFTContract(BaseContract):
 class ShannonNFTContract(BaseContract):
     address: str = AsyncWeb3.to_checksum_address("0x715A73f6C71aB9cB32c7Cc1Aa95967a1b5da468D")
     abi_file: str = "claim_nft.json"
+    
+@dataclass(slots=True)
+class ZNSContract(BaseContract):
+    address: str = AsyncWeb3.to_checksum_address("0xf180136DdC9e4F8c9b5A9FE59e2b1f07265C5D4D")
+    abi_file: str = "zns_domen.json"

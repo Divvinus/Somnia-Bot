@@ -1,6 +1,6 @@
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Self
 
 from config.settings import sleep_between_tasks
 from src.api import SomniaClient
@@ -36,6 +36,17 @@ class BaseQuestModule(SomniaClient, ABC):
         self.profile_module: ProfileModule = ProfileModule(account)
         self.quest_headers: dict[str, str] = self._get_base_headers(auth=True)
         self.account: Account = account
+
+    async def __aenter__(self) -> Self:
+        await super().__aenter__()
+        self.profile_module = ProfileModule(self.account)
+        await self.profile_module.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        if hasattr(self, 'profile_module'):
+            await self.profile_module.__aexit__(exc_type, exc_val, exc_tb)
+        await super().__aexit__(exc_type, exc_val, exc_tb)
 
     @staticmethod
     def get_incomplete_quests(response: dict[str, Any]) -> list[int]:
@@ -343,6 +354,10 @@ class QuestSharingModule(BaseQuestModule):
 
 
 class QuestSocialsModule(BaseQuestModule):
+    user_id = {
+        "somnia": 1757553204747972608
+    }
+    
     def __init__(self, account: Account) -> None:
         super().__init__(
             account,
@@ -352,7 +367,7 @@ class QuestSocialsModule(BaseQuestModule):
                     60: "handle_connect_telegram",
                     61: "handle_link_username",
                     62: "handle_connect_discord", 
-                    63: "handle_twitter_follow",
+                    63: "handle_twitter_follow_somnia",
                     64: "handle_connect_twitter"
                 }
             )
@@ -397,13 +412,21 @@ class QuestSocialsModule(BaseQuestModule):
             error_msg="Failed to verify Discord connection",
         )
     
-    async def handle_twitter_follow(self) -> tuple[bool, str | None]:
+    async def handle_twitter_follow_somnia(self) -> tuple[bool, str | None]:
         if not self.account.auth_tokens_twitter:
             return False, "No Twitter auth tokens"
         
         await self.logger.logger_msg(
             msg=f'Processing "Twitter Follow"', type_msg="info", address=self.wallet_address
         )
+        
+        async with TwitterWorker(self.account) as twitter_module:
+            result_follow = await twitter_module.follow_user(self.user_id["somnia"])
+            if not result_follow:
+                return False, "Failed to follow"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)  
+        
         return await self._send_verification_request(
             quest_id=63,
             endpoint="/social/twitter/follow",
@@ -427,26 +450,38 @@ class QuestSocialsModule(BaseQuestModule):
         
 
 class QuestDarktableModule(BaseQuestModule):
+    user_id = {
+        "darktable": 1528463445745541120
+    }
+    
     def __init__(self, account: Account) -> None:
         super().__init__(
             account,
             QuestConfig(
                 campaign_id=10,
                 quest_handlers={
-                    48: "handle_twitter_follow",
+                    48: "handle_twitter_follow_darktable",
                     49: "handle_retweet",
                     50: "handle_join_discord"
                 }
             )
         )
         
-    async def handle_twitter_follow(self) -> tuple[bool, str | None]:
+    async def handle_twitter_follow_darktable(self) -> tuple[bool, str | None]:
         if not self.account.auth_tokens_twitter:
             return False, "No Twitter auth tokens"
         
         await self.logger.logger_msg(
-            msg=f'Processing "Twitter Follow"', type_msg="info", address=self.wallet_address
+            msg=f'Processing "Twitter Follow Darktable"', type_msg="info", address=self.wallet_address
         )
+        
+        async with TwitterWorker(self.account) as twitter_module:
+            result_follow = await twitter_module.follow_user(self.user_id["darktable"])
+            if not result_follow:
+                return False, "Failed to follow"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        
         return await self._send_verification_request(
             quest_id=48,
             endpoint="/social/twitter/follow",
@@ -495,6 +530,10 @@ class QuestDarktableModule(BaseQuestModule):
 
 
 class QuestPlaygroundModule(BaseQuestModule):
+    user_id = {
+        "playground": 1902733320154152960
+    }
+    
     def __init__(self, account: Account) -> None:
         super().__init__(
             account,
@@ -503,7 +542,7 @@ class QuestPlaygroundModule(BaseQuestModule):
                 quest_handlers={
                     66: "handle_create_world",
                     68: "handle_invite_two_people",
-                    69: "handle_follow_playground",
+                    69: "handle_twitter_follow_playground",
                     65: "handle_mint_avatar",
                     67: "handle_explore_world"
                 }
@@ -532,10 +571,18 @@ class QuestPlaygroundModule(BaseQuestModule):
             error_msg='Failed "Invite at least 2 people to your world"',
         )
         
-    async def handle_follow_playground(self) -> tuple[bool, str | None]:
+    async def handle_twitter_follow_playground(self) -> tuple[bool, str | None]:
         await self.logger.logger_msg(
             msg=f'Processing "Follow the Somnia Playground"', type_msg="info", address=self.wallet_address
         )
+        
+        async with TwitterWorker(self.account) as twitter_module:
+            result_follow = await twitter_module.follow_user(self.user_id["playground"])
+            if not result_follow:
+                return False, "Failed to follow"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        
         return await self._send_verification_request(
             quest_id=69,
             endpoint="social/twitter/follow",
@@ -567,26 +614,38 @@ class QuestPlaygroundModule(BaseQuestModule):
         
         
 class QuestDemonsModule(BaseQuestModule):
+    user_id = {
+        "nkdemons": 1603401673728303105
+    }
+    
     def __init__(self, account: Account) -> None:
         super().__init__(
             account,
             QuestConfig(
                 campaign_id=13,
                 quest_handlers={
-                    71: "handle_twitter_follow",
+                    71: "handle_twitter_follow_nkdemons",
                     72: "handle_retweet",
                     73: "handle_join_discord"
                 }
             )
         )
         
-    async def handle_twitter_follow(self) -> tuple[bool, str | None]:
+    async def handle_twitter_follow_nkdemons(self) -> tuple[bool, str | None]:
         if not self.account.auth_tokens_twitter:
             return False, "No Twitter auth tokens"
         
         await self.logger.logger_msg(
-            msg=f'Processing "Twitter Follow"', type_msg="info", address=self.wallet_address
+            msg=f'Processing "Twitter Follow Nkdemons"', type_msg="info", address=self.wallet_address
         )
+        
+        async with TwitterWorker(self.account) as twitter_module:
+            result_follow = await twitter_module.follow_user(self.user_id["nkdemons"])
+            if not result_follow:
+                return False, "Failed to follow"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        
         return await self._send_verification_request(
             quest_id=71,
             endpoint="/social/twitter/follow",
@@ -641,6 +700,11 @@ class QuestDemonsModule(BaseQuestModule):
     
     
 class QuestGamingFrenzyModule(BaseQuestModule):
+    user_id = {
+        "dream": 1836667007355207680,
+        "sequence": 1270142966527520768
+    }
+    
     def __init__(self, account: Account) -> None:
         super().__init__(
             account,
@@ -648,8 +712,8 @@ class QuestGamingFrenzyModule(BaseQuestModule):
                 campaign_id=14,
                 quest_handlers={
                     77: "handle_retweet_one",
-                    74: "handle_follow_dream",
-                    75: "handle_follow_sequence",
+                    74: "handle_twitter_follow_dream",
+                    75: "handle_twitter_follow_sequence",
                     76: "handle_retweet_two"
                 }
             )
@@ -685,7 +749,7 @@ class QuestGamingFrenzyModule(BaseQuestModule):
             error_msg="Failed to verify Twitter retweet",
         )
         
-    async def handle_follow_dream(self) -> tuple[bool, str | None]:
+    async def handle_twitter_follow_dream(self) -> tuple[bool, str | None]:
         if not self.account.auth_tokens_twitter:
             return False, "No Twitter auth tokens"
         
@@ -693,6 +757,12 @@ class QuestGamingFrenzyModule(BaseQuestModule):
             msg=f'Processing "Follow Dream"', type_msg="info", address=self.wallet_address
         )
         
+        async with TwitterWorker(self.account) as twitter_module:
+            result_follow = await twitter_module.follow_user(self.user_id["dream"])
+            if not result_follow:
+                return False, "Failed to follow"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
         return await self._send_verification_request(
             quest_id=74,
             endpoint="/social/twitter/follow",
@@ -700,13 +770,20 @@ class QuestGamingFrenzyModule(BaseQuestModule):
             error_msg="Failed to verify Twitter follow",
         )
     
-    async def handle_follow_sequence(self) -> tuple[bool, str | None]:
+    async def handle_twitter_follow_sequence(self) -> tuple[bool, str | None]:
         if not self.account.auth_tokens_twitter:
             return False, "No Twitter auth tokens"
         
         await self.logger.logger_msg(
             msg=f'Processing "Follow Sequence"', type_msg="info", address=self.wallet_address
         )
+        
+        async with TwitterWorker(self.account) as twitter_module:
+            result_follow = await twitter_module.follow_user(self.user_id["sequence"])
+            if not result_follow:
+                return False, "Failed to follow"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
         
         return await self._send_verification_request(
             quest_id=75,
@@ -740,6 +817,195 @@ class QuestGamingFrenzyModule(BaseQuestModule):
             
         return await self._send_verification_request(
             quest_id=77,
+            endpoint="/social/twitter/retweet",
+            success_msg="Successfully verified Twitter retweet",
+            error_msg="Failed to verify Twitter retweet",
+        )
+        
+        
+class QuestSomniaGamingRoomModule(BaseQuestModule):
+    user_id = {
+        "lag": 1860957042430910464,
+        "kraftlabs": 1786428970021306368,
+        "galeon": 1430367385194700801
+    }
+    
+    def __init__(self, account: Account) -> None:
+        super().__init__(
+            account,
+            QuestConfig(
+                campaign_id=15,
+                quest_handlers={
+                    83: "handle_twitter_follow_lag",
+                    84: "handle_twitter_follow_kraftlabs",
+                    85: "handle_twitter_follow_galeon",
+                    86: "handle_join_discord"
+                }
+            )
+        )
+        
+    async def handle_twitter_follow_lag(self) -> tuple[bool, str | None]:
+        if not self.account.auth_tokens_twitter:
+            return False, "No Twitter auth tokens"
+        
+        await self.logger.logger_msg(
+            msg=f'Processing "Follow Lag"', type_msg="info", address=self.wallet_address
+        )
+        
+        async with TwitterWorker(self.account) as twitter_module:
+            result_follow = await twitter_module.follow_user(self.user_id["lag"])
+            if not result_follow:
+                return False, "Failed to follow"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        
+        return await self._send_verification_request(
+            quest_id=83,
+            endpoint="/social/twitter/follow",
+            success_msg="Successfully verified Twitter follow",
+            error_msg="Failed to verify Twitter follow",
+        )
+        
+    async def handle_twitter_follow_kraftlabs(self) -> tuple[bool, str | None]:
+        if not self.account.auth_tokens_twitter:
+            return False, "No Twitter auth tokens"
+        
+        await self.logger.logger_msg(
+            msg=f'Processing "Follow Kraftlabs"', type_msg="info", address=self.wallet_address
+        )
+        
+        async with TwitterWorker(self.account) as twitter_module:
+            result_follow = await twitter_module.follow_user(self.user_id["kraftlabs"])
+            if not result_follow:
+                return False, "Failed to follow"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        
+        return await self._send_verification_request(
+            quest_id=84,
+            endpoint="/social/twitter/follow",
+            success_msg="Successfully verified Twitter follow",
+            error_msg="Failed to verify Twitter follow",
+        )
+    
+    async def handle_twitter_follow_galeon(self) -> tuple[bool, str | None]:
+        if not self.account.auth_tokens_twitter:
+            return False, "No Twitter auth tokens"
+        
+        await self.logger.logger_msg(
+            msg=f'Processing "Follow Galeon"', type_msg="info", address=self.wallet_address
+        )
+        
+        async with TwitterWorker(self.account) as twitter_module:
+            result_follow = await twitter_module.follow_user(self.user_id["galeon"])
+            if not result_follow:
+                return False, "Failed to follow"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        
+        return await self._send_verification_request(
+            quest_id=85,
+            endpoint="/social/twitter/follow",
+            success_msg="Successfully verified Twitter follow",
+            error_msg="Failed to verify Twitter follow",
+        )
+    
+    async def handle_join_discord(self) -> tuple[bool, str | None]:
+        if not self.account.auth_tokens_discord:
+            return False, "No Discord auth tokens"
+        
+        await self.logger.logger_msg(
+            msg=f'Processing "Join Discord"', type_msg="info", address=self.wallet_address
+        )
+        
+        return await self._send_verification_request(
+            quest_id=86,
+            endpoint="/social/discord/join",
+            success_msg="Successfully verified Discord join",
+            error_msg="Failed to verify Discord join",
+        )
+        
+    
+class QuestMulletCopModule(BaseQuestModule):
+    user_id = {
+        "mulletcop": 1910155420762800128
+    }
+    
+    def __init__(self, account: Account) -> None:
+        super().__init__(
+            account,
+            QuestConfig(
+                campaign_id=16,
+                quest_handlers={
+                    87: "handle_twitter_follow_mulletcop",
+                    88: "handle_join_discord",
+                    89: "handle_retweet_and_like"
+                }
+            )
+        )
+        
+    async def handle_twitter_follow_mulletcop(self) -> tuple[bool, str | None]:
+        if not self.account.auth_tokens_twitter:
+            return False, "No Twitter auth tokens"
+        
+        await self.logger.logger_msg(
+            msg=f'Processing "Follow Mulletcop"', type_msg="info", address=self.wallet_address
+        )
+        
+        async with TwitterWorker(self.account) as twitter_module:
+            result_follow = await twitter_module.follow_user(self.user_id["mulletcop"])
+            if not result_follow:
+                return False, "Failed to follow"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        
+        return await self._send_verification_request(
+            quest_id=87,
+            endpoint="/social/twitter/follow",
+            success_msg="Successfully verified Twitter follow",
+            error_msg="Failed to verify Twitter follow",
+        )
+        
+    async def handle_join_discord(self) -> tuple[bool, str | None]:
+        if not self.account.auth_tokens_discord:
+            return False, "No Discord auth tokens"
+        
+        await self.logger.logger_msg(
+            msg=f'Processing "Join Discord"', type_msg="info", address=self.wallet_address
+        )
+        
+        return await self._send_verification_request(
+            quest_id=88,
+            endpoint="/social/discord/join",
+            success_msg="Successfully verified Discord join",
+            error_msg="Failed to verify Discord join",
+        )
+    
+    async def handle_retweet_and_like(self) -> tuple[bool, str | None]:
+        if not self.account.auth_tokens_twitter:
+            return False, "No Twitter auth tokens"
+        
+        await self.logger.logger_msg(
+            msg=f'Processing "Retweet and like"', type_msg="info", address=self.wallet_address
+        )
+        
+        tweet_id = 1912536593144967388
+        
+        async with TwitterWorker(self.account) as twitter_module:
+            result_retweet = await twitter_module.retweet_tweeet(tweet_id)
+            if not result_retweet:
+                return False, "Failed to retweet"
+            
+            await random_sleep(self.wallet_address, **sleep_between_tasks)
+            
+            result_like = await twitter_module.like_tweet(tweet_id)
+            if not result_like:
+                return False, "Failed to like"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        
+        return await self._send_verification_request(
+            quest_id=89,
             endpoint="/social/twitter/retweet",
             success_msg="Successfully verified Twitter retweet",
             error_msg="Failed to verify Twitter retweet",

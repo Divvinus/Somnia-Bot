@@ -523,6 +523,12 @@ class ModuleProcessor(AsyncLogger):
                 except Exception as e:
                     pass
                 
+                await self.logger_msg("Cleaning up resources...", type_msg="debug")
+                for task in asyncio.all_tasks():
+                    if not task.done() and task != asyncio.current_task():
+                        task.cancel()
+                await asyncio.sleep(0.5)
+                
                 return False
             case "view_routes":
                 await self.process_view_routes()
@@ -562,13 +568,21 @@ class ModuleProcessor(AsyncLogger):
                 return False
             case module if module in self.module_functions:
                 async def process_account(account):
-                    success, message = await process_execution(account, self.module_functions[module])
-                    progress.increment()
-                    await self.logger_msg(
-                        f"Processed accounts: {progress.processed}/{progress.total}",
-                        type_msg="info"
-                    )
-                    return success, message
+                    try:
+                        success, message = await process_execution(account, self.module_functions[module])
+                        progress.increment()
+                        await self.logger_msg(
+                            f"Processed accounts: {progress.processed}/{progress.total}",
+                            type_msg="info"
+                        )
+                        return success, message
+                    except Exception as e:
+                        await self.logger_msg(
+                            f"Error processing account: {str(e)}",
+                            type_msg="error",
+                            method_name="process_account"
+                        )
+                        return False, str(e)
                     
                 tasks = []
                 async with asyncio.TaskGroup() as tg:
@@ -576,6 +590,12 @@ class ModuleProcessor(AsyncLogger):
                         tasks.append(tg.create_task(process_account(account)))
                     
                 results = [task.result() for task in tasks]
+                
+                await self.logger_msg("Cleaning up resources...", type_msg="debug")
+                for task in asyncio.all_tasks():
+                    if not task.done() and task != asyncio.current_task():
+                        task.cancel()
+                await asyncio.sleep(0.5)
                 
                 return False
             case _:

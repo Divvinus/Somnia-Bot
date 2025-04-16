@@ -11,8 +11,11 @@ from .quets import (
     QuestDarktableModule, 
     QuestPlaygroundModule,
     QuestDemonsModule,
-    QuestGamingFrenzyModule
+    QuestGamingFrenzyModule,
+    QuestSomniaGamingRoomModule,
+    QuestMulletCopModule
 )
-from .mintair import MintairDeployContractModule
-from .onchaingm import OnchainGMModule
+from .mint_air import MintairDeployContractModule
+from .onchain_gm import OnchainGMModule
 from .mint_nft import YappersNFTModule, ShannonNFTModule
+from .mint_domen import MintDomenModule

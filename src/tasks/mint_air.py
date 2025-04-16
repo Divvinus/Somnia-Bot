@@ -22,10 +22,21 @@ class MintairDeployContractModule(Wallet, AsyncLogger):
         self.deploy_contract_worker = DeployContractWorker(account)
         
     async def __aenter__(self) -> Self:
+        await Wallet.__aenter__(self)
+        self.api_client = await self.api_client.__aenter__()
         return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        pass
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if hasattr(self, 'api_client') and self.api_client:
+            try:
+                await self.api_client.__aexit__(exc_type, exc_val, exc_tb)
+            except Exception as e:
+                await self.logger_msg(
+                    msg=f"Error closing API client: {str(e)}", 
+                    type_msg="error", 
+                    address=self.wallet_address
+                )
+        await Wallet.__aexit__(self, exc_type, exc_val, exc_tb)
     
     def _get_headers(self) -> dict[str, str]:
         return {
@@ -54,12 +65,23 @@ class MintairDeployContractModule(Wallet, AsyncLogger):
         response = await self.api_client.send_request(
             request_type="GET",
             method="/v1/user/streak",
-            headers=self._get_headers()
+            headers=self._get_headers(),
+            verify=False
+        )
+        
+        await self.logger_msg(
+            msg=f"Response: {response}", 
+            type_msg="debug", 
+            address=self.wallet_address
         )
         
         response_data = response.get("data", {})
         
         streak_data = response_data.get('data', {}).get('streak')
+        
+        if not streak_data:
+            return True
+        
         updated_at_str = streak_data.get('updatedAt')
         
         if not updated_at_str:
@@ -73,43 +95,57 @@ class MintairDeployContractModule(Wallet, AsyncLogger):
         
         return time_difference.total_seconds() >= 24 * 3600
         
-    async def daily_streak(self, transaction_hash: str) -> dict[str, str]:
-        await self.logger_msg(
-            msg=f"Send a request to the 'Daily Streak'", 
-            type_msg="info", 
-            address=self.wallet_address
-        )
-        
-        json_data = {
-            'transactionHash': transaction_hash,
-            'metaData': {
-                'name': 'Somnia Testnet',
-                'type': 'Timer',
-            },
-        }
+    async def daily_streak(self, contract_address: str) -> tuple[bool, str]:
+        try:
+            await self.logger_msg(
+                msg=f"Send a request to the 'Daily Streak'", 
+                type_msg="info", 
+                address=self.wallet_address
+            )
+            
+            json_data = {
+                'transactionHash': contract_address,
+                'metaData': {
+                    'name': 'Somnia Testnet',
+                    'type': 'Timer',
+                },
+            }
                 
-        response = await self.api_client.send_request(
-            request_type="POST",
-            method="/v1/user/transaction",
-            json_data=json_data,
-            headers=self._get_headers()
-        )
-        
-        if response.get("data", {}).get("success"):
-            await self.logger_msg(
-                msg=f"Successfully completed the 'Daily Streak' task", 
-                type_msg="success", 
-                address=self.wallet_address
+            response = await self.api_client.send_request(
+                request_type="POST",
+                method="/v1/user/transaction",
+                json_data=json_data,
+                headers=self._get_headers(),
+                verify=False
             )
-            return True, "Successfully completed the 'Daily Streak' task"
-        
-        else:
+            
+            if response.get("status_code") == 404 and response.get("data").get("message") == "Account not found":
+                return True, "Account not found"                
+            
+            if response.get("data", {}).get("success"):
+                await self.logger_msg(
+                    msg=f"Successfully completed the 'Daily Streak' task", 
+                    type_msg="success", 
+                    address=self.wallet_address
+                )
+                return True, "Successfully completed the 'Daily Streak' task"
+            
+            else:
+                await self.logger_msg(
+                    msg=f"Unknown error during 'Daily Streak' task. Response: {response}", 
+                    type_msg="error", 
+                    address=self.wallet_address
+                )
+                return False, "Unknown error"
+            
+        except Exception as e:
             await self.logger_msg(
-                msg=f"Unknown error during 'Daily Streak' task. Response: {response}", 
+                msg=f"Error during 'Daily Streak' task: {str(e)}", 
                 type_msg="error", 
-                address=self.wallet_address
+                address=self.wallet_address,
+                method_name="daily_streak"
             )
-            return False, "Unknown error"
+            return False, str(e)
     
     async def run(self) -> tuple[bool, str]:
         await self.logger_msg(

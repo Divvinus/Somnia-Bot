@@ -1,8 +1,8 @@
 import asyncio
+import random
 from decimal import Decimal
 from typing import Any, Union, Self
 
-from asyncio_throttle import Throttler
 from better_proxy import Proxy
 from eth_account import Account
 from eth_account.messages import encode_defunct
@@ -29,31 +29,64 @@ class BlockchainError(Exception):
 
 class Wallet(AsyncWeb3, Account):
     ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+    DEFAULT_TIMEOUT = 60
+    MAX_RETRIES = 3
     
     def __init__(
         self, 
         private_key: str, 
         rpc_url: Union[HttpUrl, str], 
-        proxy: Proxy | None = None
+        proxy: Proxy | None = None,
+        request_timeout: int = 30
     ) -> None:
         self._provider = AsyncHTTPProvider(
             str(rpc_url),
             request_kwargs={
                 "proxy": proxy.as_url if proxy else None,
-                "ssl": False
+                "ssl": False,
+                "timeout": request_timeout
             }
         )
+            
         super().__init__(self._provider, modules={"eth": AsyncEth})
         
         self.private_key = self._initialize_private_key(private_key)
         self._contracts_cache: dict[str, AsyncContract] = {}
-        self._throttler = Throttler(rate_limit=10, period=1)
+        self._is_closed = False
         
     async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
+        await self.close()
+        
+    async def close(self):
+        if self._is_closed:
+            return
+        
+        try:
+            if self._provider:
+                if isinstance(self._provider, AsyncHTTPProvider):
+                    await self._provider.disconnect()
+                    await logger.logger_msg(
+                        msg="Provider disconnected successfully", 
+                        type_msg="debug", 
+                        class_name=self.__class__.__name__, 
+                        method_name="close"
+                    )
+                    
+            self._contracts_cache.clear()
+            
+        except Exception as e:
+            await logger.logger_msg(
+                msg=f"Error during wallet cleanup: {str(e)}", 
+                type_msg="warning", 
+                class_name=self.__class__.__name__, 
+                method_name="close"
+            )
+        finally:
+            self._is_closed = True
+            
         
     @staticmethod
     def _initialize_private_key(private_key: str) -> Account:
@@ -154,7 +187,7 @@ class Wallet(AsyncWeb3, Account):
         return float(Decimal(amount) / Decimal(10 ** decimals))
 
     async def get_nonce(self) -> Nonce:
-        for attempt in range(3):
+        for attempt in range(self.MAX_RETRIES):
             try:
                 count = await self.eth.get_transaction_count(self.wallet_address, 'pending')
                 return Nonce(count)
@@ -163,10 +196,10 @@ class Wallet(AsyncWeb3, Account):
                     msg=f"Failed to get nonce (attempt {attempt + 1}): {e}", type_msg="warning", 
                     class_name=self.__class__.__name__, method_name="get_nonce"
                 )
-                if attempt < 2:
+                if attempt < self.MAX_RETRIES - 1:
                     await asyncio.sleep(1)
                 else:
-                    raise RuntimeError("Failed to get nonce after 3 attempts") from e
+                    raise RuntimeError(f"Failed to get nonce after {self.MAX_RETRIES} attempts") from e
 
     async def check_balance(self) -> None:
         balance = await self.eth.get_balance(self.private_key.address)
@@ -303,56 +336,64 @@ class Wallet(AsyncWeb3, Account):
             return False, f"Error during approval: {str(error)}"
         
     async def send_and_verify_transaction(self, transaction: Any) -> tuple[bool, str]:
-        async with self._throttler:
-            max_attempts = 3
-            current_attempt = 0
-            last_error = None
-            
-            while current_attempt < max_attempts:
-                try:
-                    signed = self.private_key.sign_transaction(transaction)
-                    tx_hash = await self.eth.send_raw_transaction(signed.raw_transaction)
-                    receipt = await self.eth.wait_for_transaction_receipt(tx_hash)
-                    return receipt["status"] == 1, tx_hash.hex()
+        max_attempts = self.MAX_RETRIES
+        current_attempt = 0
+        last_error = None
+        
+        while current_attempt < max_attempts:
+            tx_hash = None
+            try:
+                signed = self.private_key.sign_transaction(transaction)
+                tx_hash = await self.eth.send_raw_transaction(signed.raw_transaction)
+                
+                receipt = await asyncio.wait_for(
+                    self.eth.wait_for_transaction_receipt(tx_hash),
+                    timeout=self.DEFAULT_TIMEOUT
+                )
+                
+                return receipt["status"] == 1, tx_hash.hex()
+                
+            except asyncio.TimeoutError:
+                if tx_hash:
+                    await logger.logger_msg(
+                        msg=f"Transaction sent but confirmation timed out. Hash: {tx_hash.hex()}", 
+                        type_msg="warning", 
+                        class_name=self.__class__.__name__, 
+                        method_name="send_and_verify_transaction"
+                    )
+                    return None, f"PENDING:{tx_hash.hex()}"
                     
-                except Exception as error:
-                    error_str = str(error)
-                    last_error = error
-                    current_attempt += 1
-                    
-                    if "NONCE_TOO_SMALL" in error_str or "nonce too low" in error_str.lower():
+            except Exception as error:
+                error_str = str(error)
+                last_error = error
+                current_attempt += 1
+                
+                if "NONCE_TOO_SMALL" in error_str or "nonce too low" in error_str.lower():
+                    await logger.logger_msg(
+                        msg=f"Nonce too small. Current: {transaction.get('nonce')}. Getting new nonce.", 
+                        type_msg="warning", 
+                        class_name=self.__class__.__name__, method_name="send_and_verify_transaction"
+                    )
+                    try:
+                        new_nonce = await self.eth.get_transaction_count(self.wallet_address, 'pending')
+                        if new_nonce <= transaction['nonce']:
+                            new_nonce = transaction['nonce'] + 1
+                        transaction['nonce'] = new_nonce
                         await logger.logger_msg(
-                            msg=f"Nonce too small. Current: {transaction.get('nonce')}. Getting new nonce.", 
-                            type_msg="warning", 
+                            msg=f"New nonce set: {new_nonce}", 
+                            type_msg="debug", 
                             class_name=self.__class__.__name__, method_name="send_and_verify_transaction"
                         )
-                        try:
-                            new_nonce = await self.get_nonce()
-                            transaction['nonce'] = new_nonce
-                        except Exception as nonce_error:
-                            await logger.logger_msg(
-                                msg=f"Error during getting new nonce: {str(nonce_error)}", 
-                                type_msg="error", 
-                                class_name=self.__class__.__name__, method_name="send_and_verify_transaction"
-                            )
-                    elif "too many requests" in error_str.lower():
+                    except Exception as nonce_error:
                         await logger.logger_msg(
-                            msg=f"Received too many requests. Waiting before retrying...", 
-                            type_msg="warning", 
-                            class_name=self.__class__.__name__, method_name="send_and_verify_transaction"
-                        )
-                        await asyncio.sleep(2 * current_attempt)
-                    else:
-                        await logger.logger_msg(
-                            msg=f"Error during sending transaction: {error_str}", 
+                            msg=f"Error getting new nonce: {str(nonce_error)}", 
                             type_msg="error", 
                             class_name=self.__class__.__name__, method_name="send_and_verify_transaction"
                         )
-                        return False, error_str
-                        
-                    await asyncio.sleep(2)
-            
-            return False, f"Failed to execute transaction after {max_attempts} attempts. Last error: {str(last_error)}"
+                    delay = random.uniform(1, 3) * (2 ** current_attempt)
+                    await asyncio.sleep(delay)
+        
+        return False, f"Failed to execute transaction after {max_attempts} attempts. Last error: {str(last_error)}"
     
     async def _process_transaction(self, transaction: Any) -> tuple[bool, str]:
         try:

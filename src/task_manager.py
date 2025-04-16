@@ -78,6 +78,16 @@ class SomniaBot:
     async def process_quest_gaming_frenzy(account: Account) -> tuple[bool, str]:
         async with QuestGamingFrenzyModule(account) as module:
             return await module.run()
+        
+    @staticmethod
+    async def process_quest_somnia_gaming_room(account: Account) -> tuple[bool, str]:
+        async with QuestSomniaGamingRoomModule(account) as module:
+            return await module.run()
+        
+    @staticmethod
+    async def process_quest_mullet(account: Account) -> tuple[bool, str]:
+        async with QuestMulletCopModule(account) as module:
+            return await module.run()
 
     @staticmethod
     async def process_mint_air(account: Account) -> tuple[bool, str]:
@@ -97,4 +107,9 @@ class SomniaBot:
     @staticmethod
     async def process_shannon_nft(account: Account) -> tuple[bool, str]:
         async with ShannonNFTModule(account) as module:
+            return await module.run()
+        
+    @staticmethod
+    async def process_mint_domen(account: Account) -> tuple[bool, str]:
+        async with MintDomenModule(account) as module:
             return await module.run()

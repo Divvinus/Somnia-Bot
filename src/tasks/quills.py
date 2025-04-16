@@ -1,8 +1,7 @@
 import time
 
 from faker import Faker
-from contextlib import asynccontextmanager
-
+from typing import Self
 from src.logger import AsyncLogger
 from src.api import BaseAPIClient
 from src.wallet import Wallet
@@ -42,20 +41,22 @@ class QuillsMessageModule(Wallet, AsyncLogger):
     def api(self, value: BaseAPIClient) -> None:
         self._api = value
         
-    async def __aenter__(self):
+    async def __aenter__(self) -> Self:
+        await Wallet.__aenter__(self)
+        self._api = await self._api.__aenter__()
         return self
     
-    @asynccontextmanager
-    async def api_context(self):
-        try:
-            if not hasattr(self.api, 'session') or self.api.session is None or self.api.session.closed:
-                self.api.session = await self.api._get_session()
-            yield self.api
-        finally:
-            pass
-
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
+        if hasattr(self, '_api') and self._api:
+            try:
+                await self._api.__aexit__(exc_type, exc_val, exc_tb)
+            except Exception as e:
+                await self.logger_msg(
+                    msg=f"Error closing API client: {str(e)}", 
+                    type_msg="error", 
+                    address=self.wallet_address
+                )
+        await Wallet.__aexit__(self, exc_type, exc_val, exc_tb)
     
     async def _process_api_response(self, response: dict, operation_name: str) -> tuple[bool, str]:
         if not response:
@@ -94,14 +95,13 @@ class QuillsMessageModule(Wallet, AsyncLogger):
             'message': message,
         }
         
-        async with self.api_context() as api:
-            response = await api.send_request(
-                request_type="POST",
-                method="/auth/wallet",
-                json_data=json_data,
-                headers=_get_headers(),
-                verify=False
-            )
+        response = await self._api.send_request(
+            request_type="POST",
+            method="/auth/wallet",
+            json_data=json_data,
+            headers=_get_headers(),
+            verify=False
+        )
         
         return await self._process_api_response(response, "logged into the site quills.fun")
 
@@ -126,14 +126,13 @@ class QuillsMessageModule(Wallet, AsyncLogger):
                     type_msg="info", address=self.wallet_address
                 )
                 
-                async with self.api_context() as api:
-                    response = await api.send_request(
-                        request_type="POST",
-                        method="/mint-nft",
-                        json_data=json_data,
-                        headers=_get_headers(),
-                        verify=False
-                    )
+                response = await self._api.send_request(
+                    request_type="POST",
+                    method="/mint-nft",
+                    json_data=json_data,
+                    headers=_get_headers(),
+                    verify=False
+                )
                 
                 if response is None:
                     await self.logger_msg(
@@ -165,12 +164,20 @@ class QuillsMessageModule(Wallet, AsyncLogger):
         return False, "Failed to mint an nft message"
     
     async def run(self) -> tuple[bool, str]:
-        await self.logger_msg(
-            msg=f"I perform tasks on sending and minting nft message on the site quills.fun...", 
-            type_msg="info", address=self.wallet_address
-        )
+        try:
+            await self.logger_msg(
+                msg=f"I perform tasks on sending and minting nft message on the site quills.fun...", 
+                type_msg="info", address=self.wallet_address
+            )
+            
+            if not await self.auth():
+                return False, "Failed to authorize on the site quills.fun"
+            
+            return await self.mint_message_nft()
         
-        if not await self.auth():
-            return False, "Failed to authorize on the site quills.fun"
-        
-        return await self.mint_message_nft()
+        except Exception as e:
+            await self.logger_msg(
+                msg=f"Error: {str(e)}", type_msg="error", 
+                address=self.wallet_address, method_name="run"
+            )
+            return False, str(e)

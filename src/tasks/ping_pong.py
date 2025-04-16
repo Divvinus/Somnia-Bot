@@ -1,6 +1,7 @@
 import random
 
 from web3.contract import AsyncContract
+from typing import Self
 
 from config.settings import sleep_between_minting, sleep_between_swap
 from src.wallet import Wallet
@@ -20,11 +21,12 @@ class MintPingPongModule(Wallet, AsyncLogger):
         Wallet.__init__(self, account.private_key, rpc_url, account.proxy)
         AsyncLogger.__init__(self)
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Self:
+        await Wallet.__aenter__(self)
         return self
-
+    
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
+        await Wallet.__aexit__(self, exc_type, exc_val, exc_tb)
 
     async def _mint_tokens(
         self,
@@ -113,12 +115,12 @@ class SwapPingPongModule(Wallet, AsyncLogger):
         )
         AsyncLogger.__init__(self)
 
-    async def __aenter__(self):
-        await super().__aenter__()
+    async def __aenter__(self) -> Self:
+        await Wallet.__aenter__(self)
         return self
-
+    
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
+        await Wallet.__aexit__(self, exc_type, exc_val, exc_tb)
 
     async def _calculate_amount(
         self,

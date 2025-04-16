@@ -1,0 +1,54 @@
+[
+    {
+    "inputs": [
+        {
+        "internalType": "address[]",
+        "name": "owners",
+        "type": "address[]"
+        },
+        {
+        "internalType": "string[]",
+        "name": "domainNames",
+        "type": "string[]"
+        },
+        {
+        "internalType": "uint256[]",
+        "name": "expiries",
+        "type": "uint256[]"
+        },
+        {
+        "internalType": "address",
+        "name": "referral",
+        "type": "address"
+        },
+        {
+        "internalType": "uint256",
+        "name": "credits",
+        "type": "uint256"
+        }
+    ],
+    "name": "registerDomains",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+    },
+    {
+        "inputs": [
+          {
+            "internalType": "uint16",
+            "name": "len",
+            "type": "uint16"
+          }
+        ],
+        "name": "priceToRegister",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      }
+]

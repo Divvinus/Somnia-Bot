@@ -203,3 +203,102 @@ class TwitterWorker(Wallet, AsyncLogger):
                 method_name="like_tweet"
             )
             return False
+        
+    async def follow_user(self, user_id: int) -> bool:
+        await self.logger_msg(
+            msg=f"Trying to follow user with ID: {user_id}", 
+            type_msg="info", 
+            address=self.wallet_address
+        )
+        
+        async with self._get_twitter_client() as client:
+            if not client:
+                await self.logger_msg(
+                    msg=f"Failed to initialize Twitter client for follow", 
+                    type_msg="error", 
+                    address=self.wallet_address, 
+                    method_name="follow_user"
+                )
+                return False
+
+            for attempt in range(3):
+                try:
+                    url = "https://x.com/i/api/1.1/friendships/create.json"
+                    data = {
+                        "include_profile_interstitial_type": "1",
+                        "include_blocking": "1",
+                        "include_blocked_by": "1",
+                        "include_followed_by": "1",
+                        "include_want_retweets": "1",
+                        "include_mute_edge": "1",
+                        "include_can_dm": "1",
+                        "include_can_media_tag": "1",
+                        "include_ext_is_blue_verified": "1",
+                        "include_ext_verified_type": "1",
+                        "include_ext_profile_image_shape": "1",
+                        "skip_status": "1",
+                        "user_id": str(user_id)
+                    }
+                    
+                    try:
+                        response, data = await client.request("POST", url, data=data)
+                        
+                        if "id" in data and data["id"] == user_id:
+                            await self.logger_msg(
+                                msg=f"Successfully followed user {user_id}", 
+                                type_msg="success", 
+                                address=self.wallet_address
+                            )
+                            return True
+                            
+                    except Exception as api_error:
+                        error_str = str(api_error)
+                        if "108" in error_str or "You are unable to follow more people at this time" in error_str:
+                            await self.logger_msg(
+                                msg=f"Unable to follow user {user_id}: {error_str}", 
+                                type_msg="error", 
+                                address=self.wallet_address, 
+                                method_name="follow_user"
+                            )
+                            return False
+                        elif "160" in error_str or "You have already requested to follow" in error_str:
+                            await self.logger_msg(
+                                msg=f"Already requested to follow user {user_id}", 
+                                type_msg="success", 
+                                address=self.wallet_address
+                            )
+                            return True
+                        elif "162" in error_str or "You have been blocked from following this account" in error_str:
+                            await self.logger_msg(
+                                msg=f"Blocked from following user {user_id}", 
+                                type_msg="error", 
+                                address=self.wallet_address, 
+                                method_name="follow_user"
+                            )
+                            return False
+                        else:
+                            is_invalid_token = await check_twitter_error_for_invalid_token(
+                                api_error, 
+                                self.account.auth_tokens_twitter, 
+                                self.wallet_address
+                            )
+                            if is_invalid_token:
+                                return False
+
+                except Exception as outer_error:
+                    await self.logger_msg(
+                        msg=f"Unexpected error: {outer_error}", 
+                        type_msg="error", 
+                        address=self.wallet_address, 
+                        method_name="follow_user"
+                    )
+                    if attempt == 2:
+                        return False
+
+            await self.logger_msg(
+                msg=f"Failed to follow user after 3 attempts", 
+                type_msg="error", 
+                address=self.wallet_address, 
+                method_name="follow_user"
+            )
+            return False

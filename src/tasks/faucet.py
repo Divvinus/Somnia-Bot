@@ -26,17 +26,14 @@ class FaucetModule(Wallet):
         self.api_client: BaseAPIClient | None = None
 
     async def __aenter__(self) -> Self:
-        self.api_client = BaseAPIClient(
-            base_url="https://testnet.somnia.network",
-            proxy=self.account.proxy
-        )
-        await self.api_client.__aenter__()
+        await Wallet.__aenter__(self)
+        self.api_client = await self.api_client.__aenter__()
         return self
     
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        if self.api_client:
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if hasattr(self, 'api_client') and self.api_client:
             await self.api_client.__aexit__(exc_type, exc_val, exc_tb)
-            self.api_client = None
+        await Wallet.__aexit__(self, exc_type, exc_val, exc_tb)
 
     def _get_headers(self) -> dict[str, str]:
         return {

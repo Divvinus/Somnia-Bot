@@ -80,19 +80,19 @@ class SomniaClient(Wallet, AsyncLogger):
         return self._api
 
     async def __aenter__(self) -> Self:
+        await Wallet.__aenter__(self)
         self._api = BaseAPIClient(base_url=self.config.API_URL, proxy=self.account.proxy)
         await self._api.__aenter__()
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self._api:
-            await self._api.__aexit__(exc_type, exc_val, exc_tb)
+        try:
+            if self._api:
+                await self._api.__aexit__(exc_type, exc_val, exc_tb)
+        finally:
+            await Wallet.__aexit__(self, exc_type, exc_val, exc_tb)
 
     async def send_request(self, *args, **kwargs) -> Any:
-        if not self._api or (hasattr(self._api, 'session') and 
-                            (self._api.session is None or self._api.session.closed)):
-            if self._api:
-                self._api.session = await self._api._get_session()
         return await self.api.send_request(*args, **kwargs)
 
     def _get_base_headers(self, auth: bool = True, custom_referer: Optional[str] = None) -> Dict[str, str]:
@@ -327,10 +327,3 @@ class SomniaClient(Wallet, AsyncLogger):
                 msg=f"Failed to save referral code: {str(e)}", type_msg="error", 
                 address=self.wallet_address, method_name="save_referral_code"
             )
-
-    async def _reset_api_if_needed(self) -> None:
-        if not self._api:
-            self._api = BaseAPIClient(base_url=self.config.API_URL, proxy=self.account.proxy)
-            await self._api.__aenter__()
-        elif hasattr(self._api, 'session') and (self._api.session is None or self._api.session.closed):
-            self._api.session = await self._api._get_session()

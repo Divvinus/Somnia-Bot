@@ -52,7 +52,7 @@ class DeployContractWorker(Wallet, AsyncLogger):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        pass
+        await Wallet.__aexit__(self, exc_type, exc_val, exc_tb)
         
     async def deploy_erc_20_contract(self) -> tuple[bool, str]:        
         generator = ContractGeneratorData()

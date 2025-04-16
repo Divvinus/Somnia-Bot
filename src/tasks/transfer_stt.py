@@ -6,7 +6,6 @@ from eth_utils import to_checksum_address
 from typing import Self
 
 from src.wallet import Wallet
-from bot_loader import config
 from src.logger import AsyncLogger
 from src.models import Account
 from src.utils.logger_trx import show_trx_log
@@ -22,10 +21,11 @@ class TransferSTTModule(Wallet, AsyncLogger):
         self.me: bool = me
 
     async def __aenter__(self) -> Self:
+        await Wallet.__aenter__(self)
         return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        pass
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await Wallet.__aexit__(self, exc_type, exc_val, exc_tb)
 
     @staticmethod
     def generate_eth_address() -> str:

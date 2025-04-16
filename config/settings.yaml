@@ -10,7 +10,7 @@ threads: 10
 # en: Initial delay range before starting operations (seconds) | ru: Диапазон начальной задержки перед началом выполнения (секунды)
 delay_before_start:
     min: 10
-    max: 30
+    max: 100
 
 # en: Delay between tasks (seconds) | ru: Задержка между задачами (секунды)
 delay_between_tasks:
@@ -68,7 +68,8 @@ available_modules:
   - "onchain_gm"        # Onchain GM
   - "shannon_nft"       # Shannon NFT
   - "yappers_nft"       # Yappers NFT
-
+  - "quest_somnia_gaming_room" # Квест по Somnia Gaming Room
+  - "mint_domen"        # Минт домена
 
 #------------------------------------------------------------------------------
 # Network Settings

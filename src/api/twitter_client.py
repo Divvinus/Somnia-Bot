@@ -143,7 +143,3 @@ class TwitterClient(Wallet, AsyncLogger):
             )
             
         return None
-    
-    async def close(self):
-        if hasattr(self, 'twitter_client') and self.twitter_client:
-            await self.twitter_client.session.close()

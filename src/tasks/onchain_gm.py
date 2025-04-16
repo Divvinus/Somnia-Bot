@@ -15,10 +15,11 @@ class OnchainGMModule(Wallet, AsyncLogger):
         AsyncLogger.__init__(self)
         
     async def __aenter__(self) -> Self:
+        await Wallet.__aenter__(self)
         return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        pass
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await Wallet.__aexit__(self, exc_type, exc_val, exc_tb)
     
     async def run(self) -> tuple[bool, str]:
         await self.logger_msg(

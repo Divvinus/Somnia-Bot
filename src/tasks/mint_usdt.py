@@ -11,13 +11,13 @@ class MintUsdtModule(Wallet, AsyncLogger):
     def __init__(self, account: Account, rpc_url: str) -> None:
         Wallet.__init__(self, account.private_key, rpc_url, account.proxy)
         AsyncLogger.__init__(self)
-        self._contract_address = UsdtTokensContract().address
 
     async def __aenter__(self) -> Self:
+        await Wallet.__aenter__(self)
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await super().__aexit__(exc_type, exc_val, exc_tb)
+        await Wallet.__aexit__(self, exc_type, exc_val, exc_tb)
 
     async def mint_usdt(self) -> tuple[bool, str]:
         try:

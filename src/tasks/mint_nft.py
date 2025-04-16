@@ -17,10 +17,11 @@ class BaseNFTMintModule(Wallet, AsyncLogger):
         self.contract_config = contract_config
 
     async def __aenter__(self) -> Self:
+        await Wallet.__aenter__(self)
         return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        pass
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await Wallet.__aexit__(self, exc_type, exc_val, exc_tb)
 
     def get_claim_params(self):
         return {
@@ -69,16 +70,13 @@ class BaseNFTMintModule(Wallet, AsyncLogger):
             )
 
             return status, tx_hash
-
-        except Exception as error:
+        
+        except Exception as e:
             await self.logger_msg(
-                msg=f"Error: {str(error)}",
-                type_msg="error",
-                address=self.wallet_address,
-                method_name="run"
+                msg=f"Error: {str(e)}", type_msg="error", 
+                address=self.wallet_address, method_name="run"
             )
-            return False, str(error)
-
+            return False, str(e)
 
 class YappersNFTModule(BaseNFTMintModule):
     module_name = "Yappers NFT"

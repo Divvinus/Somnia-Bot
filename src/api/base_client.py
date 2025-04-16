@@ -69,35 +69,42 @@ class BaseAPIClient(AsyncLogger):
         )
 
     async def _get_session(self) -> aiohttp.ClientSession:
-        async with self._lock:
-            if self.session is None or self.session.closed:
-                await self.logger_msg(
-                    msg="Creating new session", 
-                    type_msg="debug", 
-                    method_name="_get_session"
-                )
-                self.session = aiohttp.ClientSession(
-                    connector=self._connector,
-                    timeout=aiohttp.ClientTimeout(total=120),
-                    headers=self._headers
-                )
-            return self.session
+        if self.session is None or self.session.closed:
+            if self._connector is None or self._connector.closed:
+                self._connector = self._create_connector()
+            self.session = aiohttp.ClientSession(
+                connector=self._connector,
+                headers=self._headers
+            )
+            await self.logger_msg(
+                msg="Creating new session", 
+                type_msg="debug", 
+                class_name=self.__class__.__name__, 
+                method_name="_get_session"
+            )
+        return self.session
 
     async def _check_session_valid(self) -> bool:
         if self.session is None or self.session.closed:
             return False
         return True
 
-    async def _safely_close_session(self, session: aiohttp.ClientSession) -> None:
-        if session and not session.closed:
+    async def _safely_close_resource(self, resource: Any, resource_name: str) -> None:
+        if resource and hasattr(resource, 'closed') and not resource.closed:
             try:
-                await session.close()
-                await asyncio.sleep(0.25)
+                await resource.close()
+                await asyncio.sleep(0.1)
+                await self.logger_msg(
+                    msg=f"{resource_name} closed", 
+                    type_msg="debug", 
+                    class_name=self.__class__.__name__,
+                    method_name="_safely_close_resource"
+                )
             except Exception as e:
                 await self.logger_msg(
-                    msg=f"Error closing session: {type(e).__name__}: {e}", 
+                    msg=f"Error closing {resource_name}: {type(e).__name__}: {e}", 
                     type_msg="warning", 
-                    method_name="_safely_close_session"
+                    method_name="_safely_close_resource"
                 )
 
     async def __aenter__(self) -> Self:
@@ -112,14 +119,8 @@ class BaseAPIClient(AsyncLogger):
         exc: BaseException | None,
         tb: TracebackType | None
     ) -> None:
-        if self.session and not self.session.closed:
-            await self._safely_close_session(self.session)
-            self.session = None
-            self._session_active = False
-        
-        if self._connector and not self._connector.closed:
-            await self._connector.close()
-            
+        await self.close()
+
     async def send_request(
         self,
         request_type: Literal["POST", "GET", "PUT", "OPTIONS"] = "POST",
@@ -238,7 +239,7 @@ class BaseAPIClient(AsyncLogger):
                         )
                         
                         if self.session and not self.session.closed:
-                            await self._safely_close_session(self.session)
+                            await self._safely_close_resource(self.session, "Session")
                         self.session = None
                         
                         if attempt < max_retries:
@@ -273,7 +274,7 @@ class BaseAPIClient(AsyncLogger):
                     )
                 
                 if self.session and not self.session.closed:
-                    await self._safely_close_session(self.session)
+                    await self._safely_close_resource(self.session, "Session")
                 self.session = None
                 
                 if attempt < max_retries:
@@ -321,7 +322,7 @@ class BaseAPIClient(AsyncLogger):
                     delay = random.uniform(*retry_delay) * min(2 ** (attempt - 1), 30)
                     
                     if self.session and not self.session.closed:
-                        await self._safely_close_session(self.session)
+                        await self._safely_close_resource(self.session, "Session")
                         self.session = None
                         
                     await asyncio.sleep(delay)
@@ -336,3 +337,46 @@ class BaseAPIClient(AsyncLogger):
                 }
 
         raise ServerError(f"Unreachable code: all {max_retries} attempts have been exhausted")
+
+    async def close(self) -> None:
+        try:
+            if hasattr(self, 'session') and self.session:
+                await self._safely_close_resource(self.session, "Session")
+                self.session = None
+            
+            if hasattr(self, '_connector') and self._connector:
+                await self._safely_close_resource(self._connector, "Connector")
+                self._connector = None
+            
+            self._session_active = False
+            
+            await self.logger_msg(
+                msg=f"API client closed successfully", 
+                type_msg="debug", 
+                class_name=self.__class__.__name__, 
+                method_name="close"
+            )
+        except Exception as e:
+            await self.logger_msg(
+                msg=f"Error during API client cleanup: {str(e)}", 
+                type_msg="error", 
+                class_name=self.__class__.__name__, 
+                method_name="close"
+            )
+            
+            self.session = None
+            self._connector = None
+            self._session_active = False
+
+    async def reset_session(self) -> None:
+        if hasattr(self, 'session') and self.session:
+            await self._safely_close_resource(self.session, "Session")
+            self.session = None
+            self._session_active = False
+        
+        await self.logger_msg(
+            msg="Session reset completed", 
+            type_msg="debug", 
+            class_name=self.__class__.__name__, 
+            method_name="reset_session"
+        )
