@@ -27,7 +27,11 @@ class FaucetModule(Wallet):
 
     async def __aenter__(self) -> Self:
         await Wallet.__aenter__(self)
-        self.api_client = await self.api_client.__aenter__()
+        self.api_client = BaseAPIClient(
+            base_url="https://testnet.somnia.network",
+            proxy=self.account.proxy
+        )
+        await self.api_client.__aenter__()
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
