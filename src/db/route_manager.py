@@ -18,6 +18,7 @@ class RouteManager:
 
     DEFAULT_MODULES: list[str] = [
         "profile",
+        "faucet",
         "transfer_stt",
         "mint_ping_pong",
         "swap_ping_pong",
