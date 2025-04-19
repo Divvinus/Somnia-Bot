@@ -113,3 +113,8 @@ class SomniaBot:
     async def process_mint_domen(account: Account) -> tuple[bool, str]:
         async with MintDomenModule(account) as module:
             return await module.run()
+        
+    @staticmethod
+    async def process_nerzo_nft(account: Account) -> tuple[bool, str]:
+        async with NerzoNFTModule(account) as module:
+            return await module.run()

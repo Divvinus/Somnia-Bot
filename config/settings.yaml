@@ -70,6 +70,7 @@ available_modules:
   - "yappers_nft"       # Yappers NFT
   - "quest_somnia_gaming_room" # Квест по Somnia Gaming Room
   - "mint_domen"        # Минт домена
+  - "nerzo_nft"         # Nerzo NFT
 
 #------------------------------------------------------------------------------
 # Network Settings
