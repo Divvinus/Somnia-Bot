@@ -237,7 +237,8 @@ class Wallet(AsyncWeb3, Account):
                 else self.private_key
             )
 
-            signature = signing_key.sign_message(text).signature
+            encoded = encode_defunct(text=text)
+            signature = signing_key.sign_message(encoded).signature
             
             return HexStr(signature.hex())
 

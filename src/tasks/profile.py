@@ -307,8 +307,7 @@ class ProfileModule(SomniaClient, AsyncLogger):
 
         try:
             payload = {"referralCode": self.referral_code, "product": "QUEST_PLATFORM"}
-            message_to_sign = orjson.dumps(payload)
-            signature = await self.get_signature(message_to_sign)
+            signature = await self.get_signature(orjson.dumps(payload).decode('utf-8'))
 
             headers = {
                 **self._base_headers,
@@ -325,6 +324,13 @@ class ProfileModule(SomniaClient, AsyncLogger):
                 headers=headers,
                 verify=False
             )
+            
+            if response.get('status_code') == 500:
+                await self.logger_msg(
+                    msg=f"The referral code has already been previously linked", 
+                    type_msg="success", address=self.wallet_address
+                )
+                return True, "Successfully bound referral code"
             
             if response.get('status_code') == 200:
                 await self.logger_msg(
