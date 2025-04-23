@@ -1,6 +1,7 @@
 import asyncio
 import random
 import orjson
+import certifi
 import ssl as ssl_module
 from types import TracebackType
 from typing import Literal, Any, Self, Type
@@ -26,6 +27,7 @@ class BaseAPIClient(AsyncLogger):
         SessionRateLimited,
         aiohttp.ClientError, 
         asyncio.TimeoutError,
+        aiohttp.ClientSSLError,
         HttpStatusError
     )
     
@@ -41,7 +43,7 @@ class BaseAPIClient(AsyncLogger):
         self._lock: asyncio.Lock = asyncio.Lock()
         self._session_active: bool = False
         self._headers: dict[str, str | bool | list[str]] = self._generate_headers()
-        self._ssl_context: ssl_module.SSLContext = ssl_module.create_default_context()
+        self._ssl_context = ssl_module.create_default_context(cafile=certifi.where())
         self._connector: aiohttp.TCPConnector = self._create_connector()
         
     @staticmethod
@@ -167,10 +169,8 @@ class BaseAPIClient(AsyncLogger):
         if user_agent:
             custom_headers['user-agent'] = user_agent
             
-        ssl_param = True
-        if isinstance(ssl, bool):
-            ssl_param = self._ssl_context if ssl else False
-        elif isinstance(ssl, ssl_module.SSLContext):
+        ssl_param = self._ssl_context if verify else False
+        if isinstance(ssl, ssl_module.SSLContext):
             ssl_param = ssl
 
         for attempt in range(1, max_retries + 1):
@@ -229,6 +229,19 @@ class BaseAPIClient(AsyncLogger):
                                 raise ServerError(f"Server error: {status_code}", result)
                         
                         return result
+                    
+                except aiohttp.ClientSSLError as ssl_error:
+                    await self.logger_msg(
+                        msg=f"SSL Error: {ssl_error}. Resetting session...",
+                        type_msg="warning",
+                        method_name="send_request"
+                    )
+                    await self.reset_session()
+                    if attempt < max_retries:
+                        delay = random.uniform(*retry_delay) * min(2 ** (attempt - 1), 30)
+                        await asyncio.sleep(delay)
+                        continue
+                    raise
                         
                 except RuntimeError as re:
                     if "Session is closed" in str(re):
