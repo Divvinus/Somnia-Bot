@@ -73,6 +73,7 @@ available_modules:
   - "nerzo_nft"         # Nerzo NFT
   - "quest_mullet"      # Квест по Mullet
   - "quest_intersection" # Квест по Intersection
+  - "quest_masks_of_the_void" # Квест по Masks of the Void
 
 #------------------------------------------------------------------------------
 # Network Settings

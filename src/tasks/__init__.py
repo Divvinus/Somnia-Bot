@@ -14,7 +14,8 @@ from .quets import (
     QuestGamingFrenzyModule,
     QuestSomniaGamingRoomModule,
     QuestMulletCopModule,
-    QuestIntersectionCopModule
+    QuestIntersectionCopModule,
+    QuestMasksOfTheVoidModule
 )
 from .mint_air import MintairDeployContractModule
 from .onchain_gm import OnchainGMModule

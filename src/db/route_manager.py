@@ -39,6 +39,7 @@ class RouteManager:
         "quest_mullet",
         "nerzo_nft",
         "quest_intersection",
+        "quest_masks_of_the_void",
     ]
 
     DEPENDENCIES: dict[str, list[str]] = {
@@ -64,6 +65,7 @@ class RouteManager:
         "quest_mullet": ["profile"],
         "nerzo_nft": ["faucet"],
         "quest_intersection": ["profile"],
+        "quest_masks_of_the_void": ["profile"],
     }
     
     @staticmethod

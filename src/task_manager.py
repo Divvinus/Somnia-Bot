@@ -93,6 +93,11 @@ class SomniaBot:
     async def process_quest_intersection(account: Account) -> tuple[bool, str]:
         async with QuestIntersectionCopModule(account) as module:
             return await module.run()
+        
+    @staticmethod
+    async def process_quest_masks_of_the_void(account: Account) -> tuple[bool, str]:
+        async with QuestMasksOfTheVoidModule(account) as module:
+            return await module.run()
 
     @staticmethod
     async def process_mint_air(account: Account) -> tuple[bool, str]:

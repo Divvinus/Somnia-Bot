@@ -1193,3 +1193,89 @@ class QuestIntersectionCopModule(BaseQuestModule):
     #         success_msg="Successfully verified Discord join",
     #         error_msg="Failed to verify Discord join",
     #     )
+    
+    
+class QuestMasksOfTheVoidModule(BaseQuestModule):
+    user_id = {
+        "masks": 1913357627280805888
+    }
+    
+    def __init__(self, account: Account) -> None:
+        super().__init__(
+            account,
+            QuestConfig(
+                campaign_id=18,
+                quest_handlers={
+                    112: "handle_twitter_follow_masks",
+                    113: "handle_join_discord",
+                    114: "handle_retweet_and_like"
+                }
+            )
+        )
+        
+    async def handle_twitter_follow_mulletcop(self) -> tuple[bool, str | None]:
+        if not self.account.auth_tokens_twitter:
+            return False, "No Twitter auth tokens"
+        
+        await self.logger.logger_msg(
+            msg=f'Processing "Follow Masks of the Void"', type_msg="info", address=self.wallet_address
+        )
+        
+        async with TwitterWorker(self.account) as twitter_module:
+            result_follow = await twitter_module.follow_user(self.user_id["masks"])
+            if not result_follow:
+                return False, "Failed to follow"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        
+        return await self._send_verification_request(
+            quest_id=112,
+            endpoint="/social/twitter/follow",
+            success_msg="Successfully verified Twitter follow",
+            error_msg="Failed to verify Twitter follow",
+        )
+        
+    async def handle_join_discord(self) -> tuple[bool, str | None]:
+        if not self.account.auth_tokens_discord:
+            return False, "No Discord auth tokens"
+        
+        await self.logger.logger_msg(
+            msg=f'Processing "Join Discord"', type_msg="info", address=self.wallet_address
+        )
+        
+        return await self._send_verification_request(
+            quest_id=113,
+            endpoint="/social/discord/join",
+            success_msg="Successfully verified Discord join",
+            error_msg="Failed to verify Discord join",
+        )
+    
+    async def handle_retweet_and_like(self) -> tuple[bool, str | None]:
+        if not self.account.auth_tokens_twitter:
+            return False, "No Twitter auth tokens"
+        
+        await self.logger.logger_msg(
+            msg=f'Processing "Retweet and like"', type_msg="info", address=self.wallet_address
+        )
+        
+        tweet_id = 1915073514182189266
+        
+        async with TwitterWorker(self.account) as twitter_module:
+            result_retweet = await twitter_module.retweet_tweeet(tweet_id)
+            if not result_retweet:
+                return False, "Failed to retweet"
+            
+            await random_sleep(self.wallet_address, **sleep_between_tasks)
+            
+            result_like = await twitter_module.like_tweet(tweet_id)
+            if not result_like:
+                return False, "Failed to like"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        
+        return await self._send_verification_request(
+            quest_id=114,
+            endpoint="/social/twitter/retweet",
+            success_msg="Successfully verified Twitter retweet",
+            error_msg="Failed to verify Twitter retweet",
+        )
