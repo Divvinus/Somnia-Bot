@@ -96,28 +96,64 @@ class MintDomenModule(Wallet, AsyncLogger):
             return True, tx_hash
 
         except Exception as e:
-            error_msg = f"Unexpected error: {str(e)}"
-            await self.logger_msg(
-                msg=error_msg,
-                type_msg="error",
-                address=self.wallet_address,
-                method_name="register_domain"
-            )
-            return False, error_msg
+            error_str = str(e)
+            if isinstance(e, tuple) and len(e) >= 1 and '0x3a81d6fc' in error_str:
+                await self.logger_msg(
+                    msg=f"Domain '{name}' already registered",
+                    type_msg="warning",
+                    address=self.wallet_address,
+                    method_name="register_domain"
+                )
+                return False, "domain_already_registered"
+            else:
+                error_msg = f"Unexpected error: {error_str}"
+                await self.logger_msg(
+                    msg=error_msg,
+                    type_msg="error",
+                    address=self.wallet_address,
+                    method_name="register_domain"
+                )
+                return False, error_msg
 
     async def run(self) -> tuple[bool, str]:
         try:
-            name = await self.generate_domain_name()
-            status, result = await self.register_domain(name)
-
-            await show_trx_log(
-                self.wallet_address,
-                f"Register domain: {name}",
-                status,
-                result
-            )
+            max_attempts = 3
+            attempt = 0
             
-            return status, "Success" if status else result
+            while attempt < max_attempts:
+                attempt += 1
+                name = await self.generate_domain_name()
+                
+                await self.logger_msg(
+                    msg=f"Attempt {attempt}/{max_attempts}: registering domain '{name}'",
+                    type_msg="info",
+                    address=self.wallet_address
+                )
+                
+                status, result = await self.register_domain(name)
+                
+                if status or result != "domain_already_registered":
+                    await show_trx_log(
+                        self.wallet_address,
+                        f"Register domain: {name}",
+                        status,
+                        result
+                    )
+                    return status, "Success" if status else result
+                
+                if attempt < max_attempts:
+                    await self.logger_msg(
+                        msg=f"Trying another domain name...",
+                        type_msg="info",
+                        address=self.wallet_address
+                    )
+            
+            await self.logger_msg(
+                msg=f"Failed to register domain after {max_attempts} attempts",
+                type_msg="error",
+                address=self.wallet_address
+            )
+            return False, f"Failed to register domain after {max_attempts} attempts"
 
         except Exception as e:
             await self.logger_msg(

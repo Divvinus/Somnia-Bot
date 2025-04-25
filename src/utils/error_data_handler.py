@@ -160,7 +160,7 @@ async def save_bad_twitter_token(twitter_token: str, wallet_address: str = None)
             
 async def check_twitter_error_for_invalid_token(error_message: str, twitter_token: str, wallet_address: str) -> bool:
     if isinstance(error_message, dict):
-        if error_message.get('error_code') == 32 and error_message.get('error_message') == 'Could not authenticate you.':
+        if error_message.get('error_code') == 32:
             await logger.logger_msg(
                 f"Detected invalid Twitter token (error code 32)", type_msg="warning", 
                 address=wallet_address, method_name="check_twitter_error_for_invalid_token"
@@ -170,7 +170,7 @@ async def check_twitter_error_for_invalid_token(error_message: str, twitter_toke
 
     error_str = str(error_message).lower()
     auth_error_keywords = [
-        "invalid token",  "401", "403", "could not authenticate you"
+        "invalid token",  "401", "403"
     ]
     
     if any(keyword in error_str for keyword in auth_error_keywords):
