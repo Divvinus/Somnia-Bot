@@ -1,129 +1,192 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Self
+from typing import Any
 from urllib.parse import parse_qs, urlparse
-import asyncio
 
 from curl_cffi.requests import AsyncSession
 
-from src.exceptions.custom_exceptions import DiscordAuthError, DiscordError
+from src.exceptions.discord_exceptions import (
+    DiscordAuthError,
+    DiscordClientError,
+    DiscordInvalidTokenError,
+    DiscordNetworkError,
+    DiscordRateLimitError,
+    DiscordServerError,
+)
 from src.models import Account
-from src.utils import save_bad_discord_token
+from src.utils import save_bad_discord_token, get_address
 
-file_lock = asyncio.Lock()
 
-@dataclass
+Headers = dict[str, str]
+
+
+@dataclass(frozen=True)
 class DiscordConfig:
+    """
+    Configuration constants for Discord API interaction.
+    """
     API_VERSION: str = "v9"
     CLIENT_ID: str = "1318915934878040064"
     GUILD_ID: str = "1284288403638325318"
     REDIRECT_URI: str = "https://quest.somnia.network/discord"
     BASE_URL: str = "https://discord.com"
     API_URL: str = f"{BASE_URL}/api/{API_VERSION}"
-    OAUTH_URL: str = f"{BASE_URL}/oauth2/authorize"
-    STATE: str = "eyJ0eXBlIjoiQ09OTkVDVF9ESVNDT1JEIn0="
-    SUPER_PROPERTIES: str = "eyJvcyI6IldpbmRvd3MiLCJicm93c2VyIjoiQ2hyb21lIiwiZGV2aWNlIjoiIiwic3lzdGVtX2xvY2FsZSI6InJ1IiwiYnJvd3Nlcl91c2VyX2FnZW50IjoiTW96aWxsYS81LjAgKFdpbmRvd3MgTlQgMTAuMDsgV2luNjQ7IHg2NCkgQXBwbGVXZWJLaXQvNTM3LjM2IChLSFRNTCwgbGlrZSBHZWNrbykgQ2hyb21lLzEyOS4wLjAuMCBTYWZhcmkvNTM3LjM2IiwiYnJvd3Nlcl92ZXJzaW9uIjoiMTI5LjAuMC4wIiwib3NfdmVyc2lvbiI6IjEwIiwicmVmZXJyZXIiOiJodHRwczovL2Rpc2NvcmQuY29tL2FwcC9pbnZpdGUtd2l0aC1ndWlsZC1vbmJvYXJkaW5nL2lua29uY2hhaW4iLCJyZWZlcnJpbmdfZG9tYWluIjoiZGlzY29yZC5jb20iLCJyZWZlcnJlcl9jdXJyZW50IjoiaHR0cHM6Ly9xdWVzdC5zb21uaWEubmV0d29yay8iLCJyZWZlcnJpbmdfZG9tYWluX2N1cnJlbnQiOiJxdWVzdC5zb21uaWEubmV0d29yayIsInJlbGVhc2VfY2hhbm5lbCI6InN0YWJsZSIsImNsaWVudF9idWlsZF9udW1iZXIiOjM3MDUzMywiY2xpZW50X2V2ZW50X3NvdXJjZSI6bnVsbCwiaGFzX2NsaWVudF9tb2RzIjpmYWxzZX0="
+    OAUTH_PATH: str = "/oauth2/authorize"
+    STATE: str = (
+        "eyJ0eXBlIjoiQ09OTkVDVF9ESVNDT1JEIn0="
+    )
+    SUPER_PROPERTIES: str = (
+        "eyJvcyI6IldpbmRvd3MiLCJicm93c2VyIjoiQ2hyb21lIiwiZGV2aWNlIjoiIiwi"
+        "c3lzdGVtX2xvY2FsZSI6InJ1IiwiYnJvd3Nlcl91c2VyX2FnZW50IjoiTW96aWxsYS"
+    )
 
 
 class DiscordClient:
-    def __init__(self, account: Account):
-        self.token = account.auth_tokens_discord
-        self.proxy = account.proxy
-        self.discord_config = DiscordConfig()
-        self.session: AsyncSession | None = None
+    """
+    Asynchronous Discord OAuth2 client for account linking.
+    """
 
-        if not self.token:
-            raise DiscordError("Discord token not provided")
+    def __init__(self, account: Account) -> None:
+        self._token: str | None = account.auth_tokens_discord
+        self._proxy = account.proxy
+        self._config = DiscordConfig()
+        self._session: AsyncSession | None = None
+        self.wallet_address = get_address(account.private_key)
 
-    async def __aenter__(self) -> Self:
-        self.session = AsyncSession(
-            verify=False,
-            timeout=30
-        )
-        if self.proxy:
-            proxy_url = self.proxy.as_url
-            self.session.proxies.update({"http": proxy_url, "https": proxy_url})
+        if not self._token:
+            raise DiscordClientError("Discord token not provided")
+
+    async def __aenter__(self) -> "DiscordClient":
+        self._session = AsyncSession(verify=False, timeout=30)
+        if self._proxy:
+            proxy_url = self._proxy.as_url
+            self._session.proxies.update({"http": proxy_url, "https": proxy_url})
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        if self.session:
-            await self.session.close()
-            self.session = None
+    async def __aexit__(
+        self,
+        exc_type: Any,
+        exc_val: Any,
+        exc_tb: Any,
+    ) -> None:
+        if self._session:
+            await self._session.close()
+            self._session = None
 
     @cached_property
-    async def auth_headers(self) -> dict[str, str]:
+    def _base_headers(self) -> Headers:
+        """
+        Base headers for Discord API calls, including authorization.
+        """
         return {
-            'authority': 'discord.com',
-            'accept': 'application/json',
-            'authorization': self.token,
-            'content-type': 'application/json',
-            'dnt': '1',
-            'origin': self.discord_config.BASE_URL,
-            'sec-fetch-dest': 'empty',
-            'sec-fetch-mode': 'cors',
-            'sec-fetch-site': 'same-origin',
-            'x-super-properties': self.discord_config.SUPER_PROPERTIES,
-            'x-requested-with': 'XMLHttpRequest'
+            "authority": "discord.com",
+            "accept": "application/json",
+            "authorization": self._token,
+            "content-type": "application/json",
+            "dnt": "1",
+            "origin": self._config.BASE_URL,
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
+            "x-super-properties": self._config.SUPER_PROPERTIES,
+            "x-requested-with": "XMLHttpRequest",
         }
 
-    def _get_oauth_params(self) -> dict[str, str]:
+    def _oauth_params(self) -> dict[str, str]:
+        """
+        Parameters for the OAuth2 authorization request.
+        """
         return {
-            'client_id': self.discord_config.CLIENT_ID,
-            'response_type': 'code',
-            'redirect_uri': self.discord_config.REDIRECT_URI,
-            'scope': 'identify',
-            'state': self.discord_config.STATE
+            "client_id": self._config.CLIENT_ID,
+            "response_type": "code",
+            "redirect_uri": self._config.REDIRECT_URI,
+            "scope": "identify",
+            "state": self._config.STATE,
         }
 
-    def _get_oauth_referer(self, params: dict[str, str]) -> str:
-        return f"https://discord.com/oauth2/authorize?response_type=code&client_id=1318915934878040064&redirect_uri=https%3A%2F%2Fquest.somnia.network%2Fdiscord&scope=identify&state=eyJ0eXBlIjoiQ09OTkVDVF9ESVNDT1JEIn0="
+    def _oauth_referer(self, params: dict[str, str]) -> str:
+        """
+        Constructs the Referer URL for the OAuth2 request.
+        """
+        query = (
+            f"response_type={params['response_type']}"
+            f"&client_id={params['client_id']}"
+            f"&redirect_uri={params['redirect_uri']}"
+            f"&scope={params['scope']}"
+            f"&state={params['state']}"
+        )
+        return f"{self._config.BASE_URL}{self._config.OAUTH_PATH}?{query}"
 
     @staticmethod
-    def _extract_auth_code(response_data: dict) -> str | None:
-        if 'location' not in response_data:
-            return None
-        parsed_url = urlparse(response_data['location'])
-        query_params = parse_qs(parsed_url.query)
-        return query_params.get('code', [None])[0]
+    def _extract_auth_code(response_data: dict[str, Any]) -> str:
+        """
+        Parses redirect location header to extract the authorization code.
+        """
+        location = response_data.get("location")
+        if not location:
+            raise DiscordAuthError("Location header missing in response")
 
-    async def _request_authorization(self) -> str:
+        parsed = urlparse(location)
+        code = parse_qs(parsed.query).get("code", [None])[0]
+        if not code:
+            raise DiscordAuthError("Authorization code not found in response")
+        return code
+
+    async def _validate_status(
+        self, status: int, text: str
+    ) -> None:
+        """
+        Validates HTTP status and raises appropriate errors.
+        """
+        if status in (401, 403):
+            await save_bad_discord_token(self._token, self.wallet_address)
+            raise DiscordInvalidTokenError(f"Invalid token: {text}")
+        if status >= 500:
+            raise DiscordServerError(f"Server error {status}: {text}")
+        if status != 200:
+            raise DiscordAuthError(f"Auth failed {status}: {text}")
+
+    async def request_authorization(self) -> str:
+        """
+        Sends OAuth2 authorization request and returns the auth code.
+        """
+        if not self._session:
+            raise DiscordNetworkError("Session not initialized")
+
+        params = self._oauth_params()
+        referer = self._oauth_referer(params)
+        headers = {**self._base_headers, "referer": referer}
+        payload = {
+            "permissions": "0",
+            "authorize": True,
+            "integration_type": 0,
+            "location_context": {
+                "guild_id": self._config.GUILD_ID,
+                "channel_id": "10000",
+                "channel_type": 10000,
+            },
+        }
+
         try:
-            oauth_params = self._get_oauth_params()
-            oauth_referer = self._get_oauth_referer(oauth_params)
-
-            headers = await self.auth_headers
-            headers['referer'] = oauth_referer
-
-            auth_data = {
-                "permissions": "0",
-                "authorize": True,
-                "integration_type": 0,
-                "location_context": {
-                    "guild_id": "10000",
-                    "channel_id": "10000",
-                    "channel_type": 10000
-                }
-            }
-
-            response = await self.session.post(
-                url=f"{self.discord_config.API_URL}/oauth2/authorize",
-                params=oauth_params,
+            response = await self._session.post(
+                url=f"{self._config.API_URL}{self._config.OAUTH_PATH}",
+                params=params,
                 headers=headers,
-                json=auth_data,
-                allow_redirects=False
+                json=payload,
+                allow_redirects=False,
             )
-            
-            if response.status_code == 401 or response.status_code == 403:
-                await save_bad_discord_token(self.token)
-                raise DiscordAuthError(f"Invalid Discord token: {response.text}")
-            elif response.status_code != 200:
-                raise DiscordAuthError(f"Authorization request failed: {response.text}")
 
-            auth_code = self._extract_auth_code(response.json())
-            if not auth_code:
-                raise DiscordAuthError(f"Failed to extract authorization code. Response: {response.text}")
+            await self._validate_status(response.status_code, response.text)
+            data = response.json()
+            return self._extract_auth_code(data)
 
-            return auth_code
-
-        except Exception as e:
-            raise DiscordAuthError(f"Authorization process failed: {str(e)}")
+        except (DiscordAuthError, DiscordInvalidTokenError, DiscordServerError):
+            raise
+        except Exception as err:
+            msg = str(err)
+            if "429" in msg:
+                raise DiscordRateLimitError(f"Rate limit: {msg}")
+            if any(tok in msg.lower() for tok in ["unauthorized", "forbidden"]):
+                await save_bad_discord_token(self._token, self.wallet_address)
+                raise DiscordInvalidTokenError(f"Detected invalid token: {msg}")
+            raise DiscordNetworkError(f"Network error: {msg}")

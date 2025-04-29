@@ -97,7 +97,7 @@ class MintDomenModule(Wallet, AsyncLogger):
 
         except Exception as e:
             error_str = str(e)
-            if isinstance(e, tuple) and len(e) >= 1 and '0x3a81d6fc' in error_str:
+            if '0x3a81d6fc' in error_str:
                 await self.logger_msg(
                     msg=f"Domain '{name}' already registered",
                     type_msg="warning",

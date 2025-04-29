@@ -32,10 +32,15 @@ class MintUsdtModule(Wallet, AsyncLogger):
 
             if balance > 0:
                 return True, "already_minted"
+            
+            await self.logger_msg(
+                msg="Minting sUSDT...",
+                type_msg="info",
+                address=self.wallet_address
+            )
 
             tx_params = await self.build_transaction_params(
-                contract.functions.mint(),
-                gas_limit=200000
+                contract.functions.mint()
             )
             
             success, tx_hash = await self._process_transaction(tx_params)
@@ -68,7 +73,7 @@ class MintUsdtModule(Wallet, AsyncLogger):
             error_msg = f"Unexpected error: {str(e)}"
             await self.logger_msg(
                 msg=error_msg,
-                type_msg="critical",
+                type_msg="error",
                 address=self.wallet_address,
                 method_name="mint_usdt"
             )
@@ -90,7 +95,7 @@ class MintUsdtModule(Wallet, AsyncLogger):
         except Exception as e:
             await self.logger_msg(
                 msg=f"Critical error: {str(e)}",
-                type_msg="critical",
+                type_msg="error",
                 address=self.wallet_address,
                 method_name="run"
             )

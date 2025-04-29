@@ -1,66 +1,81 @@
 import asyncio
-import orjson
 from functools import cached_property
-from typing import Self
+from typing import Any, Self
 
-from src.api import (
-    SomniaClient,
-    TwitterClient,
-    TelegramClient,
-    DiscordClient
-)
+import orjson
+
+from src.api import DiscordClient, SomniaClient, TelegramClient, TwitterClient
 from src.logger import AsyncLogger
 from src.models import Account
-from src.utils import generate_username, random_sleep
+from src.utils import (
+    generate_username,
+    random_sleep,
+    clear_token_after_successful_connection,
+    COL_RECONNECT_DISCORD,
+    COL_RECONNECT_TWITTER
+)
 from config.settings import (
     sleep_after_referral_bind,
     sleep_after_username_creation,
     sleep_after_discord_connection,
     sleep_after_twitter_connection,
-    sleep_after_telegram_connection
+    sleep_after_telegram_connection,
 )
 
 
 class ProfileModule(SomniaClient, AsyncLogger):
-    def __init__(self, account: Account, referral_code: str | None = None):
+    def __init__(
+        self,
+        account: Account,
+        referral_code: str | None = None,
+    ) -> None:
         SomniaClient.__init__(self, account)
         AsyncLogger.__init__(self)
-        
+
         self.account: Account = account
-        self.referral_code: str | None = referral_code            
-        self._me_info_cache: dict | None = None
-        
+        self.referral_code: str | None = referral_code
+        self._me_info_cache: dict[str, Any] | None = None
+
         self.twitter_worker: TwitterClient | None = None
         self.telegram_worker: TelegramClient | None = None
         self._discord_worker: DiscordClient | None = None
 
     async def __aenter__(self) -> Self:
         await super().__aenter__()
+
         if self.account.telegram_session:
             self.telegram_worker = TelegramClient(self.account)
             await self.telegram_worker.__aenter__()
-        
+
         if self.account.auth_tokens_twitter:
             self.twitter_worker = TwitterClient(self.account)
             await self.twitter_worker.__aenter__()
-        
+
         if self.account.auth_tokens_discord:
             self._discord_worker = DiscordClient(self.account)
             await self._discord_worker.__aenter__()
-            
+
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        cleanup_tasks = []
-        
-        if self.twitter_worker:
-            cleanup_tasks.append(self.twitter_worker.__aexit__(exc_type, exc_val, exc_tb))
-        if self.telegram_worker:
-            cleanup_tasks.append(self.telegram_worker.__aexit__(exc_type, exc_val, exc_tb))
-        if self._discord_worker:
-            cleanup_tasks.append(self._discord_worker.__aexit__(exc_type, exc_val, exc_tb))
-        
-        await asyncio.gather(*cleanup_tasks, return_exceptions=True)
+    async def __aexit__(
+        self,
+        exc_type: Any,
+        exc_val: Any,
+        exc_tb: Any,
+    ) -> None:
+        tasks = [
+            worker.__aexit__(exc_type, exc_val, exc_tb)
+            for worker in (
+                self.twitter_worker,
+                self.telegram_worker,
+                self._discord_worker,
+            )
+            if worker
+        ]
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
         await super().__aexit__(exc_type, exc_val, exc_tb)
 
     @property
@@ -70,14 +85,14 @@ class ProfileModule(SomniaClient, AsyncLogger):
         return self._discord_worker
 
     @discord_worker.setter
-    def discord_worker(self, value: DiscordClient | None):
-        self._discord_worker = value
+    def discord_worker(self, client: DiscordClient | None) -> None:
+        self._discord_worker = client
 
     @cached_property
     def _base_headers(self) -> dict[str, str]:
         return {
             "accept": "application/json",
-            "authorization": f"Bearer {self._authorization_token}",
+            "authorization": f"Bearer {self._token}",
             "content-type": "application/json",
             "origin": "https://quest.somnia.network",
             "sec-fetch-dest": "empty",
@@ -87,15 +102,17 @@ class ProfileModule(SomniaClient, AsyncLogger):
 
     async def create_username(self) -> tuple[bool, str]:
         await self.logger_msg(
-            msg=f"Trying to set the username...", 
-            type_msg="info", address=self.wallet_address
+            msg="Trying to set the username...",
+            type_msg="info",
+            address=self.wallet_address,
         )
+
         headers = {
             **self._base_headers,
             "referer": "https://quest.somnia.network/account",
         }
 
-        for _ in range(3):
+        for attempt in range(1, 4):
             try:
                 username = generate_username()
                 response = await self.send_request(
@@ -106,366 +123,447 @@ class ProfileModule(SomniaClient, AsyncLogger):
                     verify=False,
                 )
 
-                if response.get('status_code') in [200, 201, 204]:
+                status = response.get("status_code")
+                if status in (200, 201, 204):
                     await self.logger_msg(
-                        msg=f"Created username {username}", 
-                        type_msg="success", address=self.wallet_address
+                        msg=f"Created username {username}",
+                        type_msg="success",
+                        address=self.wallet_address,
                     )
                     self._me_info_cache = None
                     return True, "Successfully created username"
 
                 await self.logger_msg(
-                    msg=f"Failed to create username {username}. Status: {response.get('status_code')}. Let's try again...", 
-                    type_msg="warning", address=self.wallet_address, method_name="create_username"
+                    msg=(
+                        f"Attempt {attempt}: Failed to create username {username}. "
+                        f"Status: {status}. Retrying..."
+                    ),
+                    type_msg="warning",
+                    address=self.wallet_address,
+                    method_name="create_username",
                 )
                 await random_sleep(self.wallet_address, **sleep_after_username_creation)
 
             except Exception as error:
+                err_msg = str(error)
                 await self.logger_msg(
-                    msg=f"Error: {str(error)}", type_msg="error", 
-                    address=self.wallet_address, method_name="create_username"
+                    msg=f"Error creating username: {err_msg}",
+                    type_msg="error",
+                    address=self.wallet_address,
+                    method_name="create_username",
                 )
-                return False, str(error)
-            
-        return False, "Failed to create username even with three attempts"
+                return False, err_msg
+
+        return False, "Failed to create username after 3 attempts"
 
     async def connect_telegram_account(self) -> tuple[bool, str]:
         await self.logger_msg(
-            msg=f"Trying to link a Telegram account to a website...", 
-            type_msg="info", address=self.wallet_address
+            msg="Linking Telegram account...",
+            type_msg="info",
+            address=self.wallet_address,
         )
+
+        if not self.telegram_worker:
+            return False, "Telegram worker not initialized"
+
         try:
             code = await self.telegram_worker.run()
             if not code:
-                await self.logger_msg(
-                    msg=f"No code received from Telegram worker", 
-                    type_msg="error", address=self.wallet_address, method_name="connect_telegram_account"
-                )
-                return False, "No code received from Telegram worker"
-            
-            json_data = {
-                'encodedDetails': code,
-                'provider': 'telegram',
-            }
+                raise RuntimeError("No code from Telegram worker")
 
+            payload = {"encodedDetails": code, "provider": "telegram"}
             headers = {
                 **self._base_headers,
                 "accept": "*/*",
-                "referer": f"https://quest.somnia.network/telegram",
+                "referer": "https://quest.somnia.network/telegram",
             }
-            
+
             response = await self.send_request(
                 request_type="POST",
                 method="/auth/socials",
-                json_data=json_data,
+                json_data=payload,
                 headers=headers,
-                verify=False
+                verify=False,
             )
-            
-            success = (
-                response.get('status_code') == 200 
-                and response.get('data', {}).get("success", False)
-            )
+
+            status = response.get("status_code")
+            success = status == 200 and response.get("data", {}).get("success", False)
             if success:
                 await self.logger_msg(
-                    msg=f"Telegram account connected successfully", 
-                    type_msg="success", address=self.wallet_address
+                    msg="Telegram account connected successfully",
+                    type_msg="success",
+                    address=self.wallet_address,
                 )
                 self._me_info_cache = None
-                return True, "Successfully connected Telegram account"
-            else:
-                status_code = response.get('status_code')
-                error_text = response.get('text', '')
+                return True, "Telegram connected"
+
+            if status == 500 and response.get("text", "").find("Internal server error") != -1:
                 await self.logger_msg(
-                    msg=f"Error connecting Telegram: Status {status_code}, Response: {error_text}", 
-                    type_msg="error", address=self.wallet_address, method_name="connect_telegram_account"
+                    msg="Telegram account already bound to another wallet in Somnia",
+                    type_msg="warning",
+                    address=self.wallet_address,
+                    method_name="connect_telegram_account",
                 )
-                return False, "Failed to connect Telegram account"
-                    
-        except Exception as e:
+                return False, "Telegram account already bound to another wallet"
+
+            err_text = response.get("text", "")
             await self.logger_msg(
-                msg=f"Error: {str(e)}", type_msg="error", 
-                address=self.wallet_address, method_name="connect_telegram_account"
+                msg=(f"Telegram connection failed: {status}, {err_text}"),
+                type_msg="error",
+                address=self.wallet_address,
+                method_name="connect_telegram_account",
             )
-            return False, str(e)
+            return False, "Failed to connect Telegram"
+
+        except Exception as e:
+            err_msg = str(e)
+            await self.logger_msg(
+                msg=f"Error connecting Telegram: {err_msg}",
+                type_msg="error",
+                address=self.wallet_address,
+                method_name="connect_telegram_account",
+            )
+            return False, err_msg
 
     async def connect_discord_account(self) -> tuple[bool, str]:
         await self.logger_msg(
-            msg=f"Trying to link a Discord account to a website...", 
-            type_msg="info", address=self.wallet_address
+            msg="Linking Discord account...",
+            type_msg="info",
+            address=self.wallet_address,
         )
+
+        if not self._discord_worker:
+            return False, "Discord worker not initialized"
+
         try:
-            code = await self._discord_worker._request_authorization()
+            code = await self._discord_worker.request_authorization()
             if not code:
-                return False, "No code received from Discord worker"
+                raise RuntimeError("No code from Discord worker")
 
             headers = {
                 **self._base_headers,
                 "accept": "*/*",
-                "referer": f"https://quest.somnia.network/discord?code={code}&state=eyJ0eXBlIjoiQ09OTkVDVF9ESVNDT1JEIn0%3D",
+                "referer": (
+                    f"https://quest.somnia.network/discord?code={code}"
+                    "&state=eyJ0eXBlIjoiQ09OTkVDVF9ESVNDT1JEIn0%3D"
+                ),
             }
+            payload = {"code": code, "provider": "discord"}
 
             response = await self.send_request(
                 request_type="POST",
                 method="/auth/socials",
+                json_data=payload,
                 headers=headers,
-                json_data={"code": code, "provider": "discord"}
+                verify=False,
             )
 
-            success = (
-                response.get('status_code') == 200 
-                and response.get('data', {}).get("success", False)
-            )
+            status = response.get("status_code")
+            success = status == 200 and response.get("data", {}).get("success", False)
             if success:
                 await self.logger_msg(
-                    msg=f"Discord account connected successfully", 
-                    type_msg="success", address=self.wallet_address
+                    msg="Discord account connected successfully",
+                    type_msg="success",
+                    address=self.wallet_address,
                 )
                 self._me_info_cache = None
-            else:
-                status_code = response.get('status_code')
-                error_text = response.get('text', '')
-                await self.logger_msg(
-                    msg=f"Error connecting Discord: Status {status_code}, Response: {error_text}", 
-                    type_msg="error", address=self.wallet_address, method_name="connect_discord_account"
-                )
+                
+                if self.account.auth_tokens_discord:
+                    await clear_token_after_successful_connection(
+                        token=self.account.auth_tokens_discord,
+                        token_column_name=COL_RECONNECT_DISCORD,
+                        wallet_address=self.wallet_address
+                    )
+                    
+                return True, "Discord connected"
 
-            return success, "Successfully connected Discord account" if success else f"Failed to connect Discord account (Status: {response.get('status_code')})"
+            if status == 500 and response.get("text", "").find("Internal server error") != -1:
+                await self.logger_msg(
+                    msg="Discord account already bound to another wallet in Somnia",
+                    type_msg="warning",
+                    address=self.wallet_address,
+                    method_name="connect_discord_account",
+                )
+                return False, "Discord account already bound to another wallet"
+
+            err_text = response.get("text", "")
+            await self.logger_msg(
+                msg=(f"Discord connection failed: {status}, {err_text}"),
+                type_msg="error",
+                address=self.wallet_address,
+                method_name="connect_discord_account",
+            )
+            return False, "Failed to connect Discord"
 
         except Exception as e:
+            err_msg = str(e)
             await self.logger_msg(
-                msg=f"Error: {str(e)}", type_msg="error", 
-                address=self.wallet_address, method_name="connect_discord_account"
+                msg=f"Error connecting Discord: {err_msg}",
+                type_msg="error",
+                address=self.wallet_address,
+                method_name="connect_discord_account",
             )
-            return False, str(e)
+            return False, err_msg
 
     async def connect_twitter_account(self) -> tuple[bool, str]:
         await self.logger_msg(
-            msg=f"Trying to connect Twitter account...", 
-            type_msg="info", address=self.wallet_address
+            msg="Linking Twitter account...",
+            type_msg="info",
+            address=self.wallet_address,
         )
+
+        if not self.twitter_worker:
+            return False, "Twitter worker not initialized"
+
         try:
             code = await self.twitter_worker.connect_twitter()
             if not code:
-                return False, "No code received from Twitter worker"
+                raise RuntimeError("No code from Twitter worker")
 
             headers = {
                 **self._base_headers,
                 "dnt": "1",
-                "referer": f"https://quest.somnia.network/twitter?state=eyJ0eXBlIjoiQ09OTkVDVF9UV0lUVEVSIn0%3D&code={code}",
+                "referer": (
+                    f"https://quest.somnia.network/twitter?state="
+                    "eyJ0eXBlIjoiQ09OTkVDVF9UV0lUVEVSIn0%3D&code={code}"
+                ),
             }
-
-            json_data = {
-                "code": code,
-                "codeChallenge": "challenge123",
-                "provider": "twitter",
-            }
+            payload = {"code": code, "provider": "twitter", "codeChallenge": "challenge123"}
 
             response = await self.send_request(
                 request_type="POST",
                 method="/auth/socials",
-                json_data=json_data,
+                json_data=payload,
                 headers=headers,
-                verify=False
+                verify=False,
             )
 
-            result = (
-                response.get('status_code') == 200 
-                and response.get('data', {}).get("success", False)
-            )
-            if result:
-                msg = f"Twitter account connected successfully"
+            status = response.get("status_code")
+            success = status == 200 and response.get("data", {}).get("success", False)
+            if success:
                 await self.logger_msg(
-                    msg=msg, 
-                    type_msg="success", address=self.wallet_address
+                    msg="Twitter account connected successfully",
+                    type_msg="success",
+                    address=self.wallet_address,
                 )
                 self._me_info_cache = None
-            else:
-                status_code = response.get('status_code')
-                error_text = response.get('text', '')
-                await self.logger_msg(
-                    msg=f"Error connecting Twitter: Status {status_code}, Response: {error_text}", 
-                    type_msg="error", address=self.wallet_address, method_name="connect_twitter_account"
-                )
+                
+                if self.account.auth_tokens_twitter:
+                    await clear_token_after_successful_connection(
+                        token=self.account.auth_tokens_twitter,
+                        token_column_name=COL_RECONNECT_TWITTER,
+                        wallet_address=self.wallet_address
+                    )
+                    
+                return True, "Twitter connected"
 
-            return result, msg if result else f"Failed to connect Twitter account (Status: {response.get('status_code')})"
+            if status == 500 and response.get("text", "").find("Internal server error") != -1:
+                await self.logger_msg(
+                    msg="Twitter account already bound to another wallet in Somnia",
+                    type_msg="warning",
+                    address=self.wallet_address,
+                    method_name="connect_twitter_account",
+                )
+                return False, "Twitter account already bound to another wallet"
+
+            err_text = response.get("text", "")
+            await self.logger_msg(
+                msg=(f"Twitter connection failed: {status}, {err_text}"),
+                type_msg="error",
+                address=self.wallet_address,
+                method_name="connect_twitter_account",
+            )
+            return False, "Failed to connect Twitter"
 
         except Exception as e:
+            err_msg = str(e)
             await self.logger_msg(
-                msg=f"Error: {str(e)}", 
-                type_msg="error", address=self.wallet_address, method_name="connect_twitter_account"
+                msg=f"Error connecting Twitter: {err_msg}",
+                type_msg="error",
+                address=self.wallet_address,
+                method_name="connect_twitter_account",
             )
-            return False, str(e)
-        
+            return False, err_msg
+
     async def referral_bind(self) -> tuple[bool, str]:
         if not self.referral_code:
             await self.logger_msg(
-                msg=f"Referral code not found", 
-                type_msg="warning", address=self.wallet_address, method_name="referral_bind"
+                msg="Referral code not provided",
+                type_msg="warning",
+                address=self.wallet_address,
+                method_name="referral_bind",
             )
             return False, "Referral code not found"
 
         try:
             payload = {"referralCode": self.referral_code, "product": "QUEST_PLATFORM"}
-            signature = await self.get_signature(orjson.dumps(payload).decode('utf-8'))
+            signature = await self.get_signature(orjson.dumps(payload).decode())
 
             headers = {
                 **self._base_headers,
                 "priority": "u=1, i",
                 "referer": f"https://quest.somnia.network/referrals/{self.referral_code}",
             }
-            
-            json_data = {**payload, "signature": f'0x{signature}'}
+            json_data = {**payload, "signature": f"0x{signature}"}
 
             response = await self.send_request(
                 request_type="POST",
                 method="/users/referrals",
                 json_data=json_data,
                 headers=headers,
-                verify=False
+                verify=False,
             )
-            
-            if response.get('status_code') == 500:
+
+            status = response.get("status_code")
+            if status == 500:
                 await self.logger_msg(
-                    msg=f"The referral code has already been previously linked", 
-                    type_msg="success", address=self.wallet_address
+                    msg="Referral code already bound",
+                    type_msg="success",
+                    address=self.wallet_address,
                 )
-                return True, "Successfully bound referral code"
-            
-            if response.get('status_code') == 200:
+                return True, "Referral was already bound"
+
+            if status == 200:
                 await self.logger_msg(
-                    msg=f"Referral code bound to the account", 
-                    type_msg="success", address=self.wallet_address
+                    msg="Referral code bound successfully",
+                    type_msg="success",
+                    address=self.wallet_address,
                 )
-                return True, "Successfully bound referral code"
-            else:
-                await self.logger_msg(
-                    msg=f"Error: {response}", 
-                    type_msg="error", address=self.wallet_address, method_name="referral_bind"
-                )
-                return False, "Failed to bind referral code"
+                return True, "Referral bound successfully"
+
+            await self.logger_msg(
+                msg=f"Referral bind failed: {response}",
+                type_msg="error",
+                address=self.wallet_address,
+                method_name="referral_bind",
+            )
+            return False, "Failed to bind referral"
 
         except Exception as e:
+            err_msg = str(e)
             await self.logger_msg(
-                msg=f"Error binding referral: {str(e)}", 
-                type_msg="error", address=self.wallet_address, method_name="referral_bind"
+                msg=f"Error binding referral: {err_msg}",
+                type_msg="error",
+                address=self.wallet_address,
+                method_name="referral_bind",
             )
-            return False, str(e)
+            return False, err_msg
 
     async def get_account_statistics(self) -> tuple[bool, str]:
-        await self.logger_msg(
-            msg=f"Getting account statistics...", 
-            type_msg="info", address=self.wallet_address
-        )
         try:
             status, result = await self.onboarding()
             if not status:
-                await self.logger_msg(
-                    msg=f"Failed to authorize on Somnia", 
-                    type_msg="error", address=self.wallet_address, method_name="get_account_statistics"
-                )
-                return status, result
-            await self.get_stats()
-            return True, "Successfully got account statistics"
+                raise RuntimeError(result)
+
+            stats = await self.get_stats()
+            if stats:
+                return True, stats
+            else:
+                return False, f"Failed to get statistics: {stats}"
+
         except Exception as e:
+            err_msg = str(e)
             await self.logger_msg(
-                msg=f"Error getting statistics: {str(e)}", 
-                type_msg="error", address=self.wallet_address, method_name="get_account_statistics"
+                msg=f"Error getting statistics: {err_msg}",
+                type_msg="error",
+                address=self.wallet_address,
+                method_name="get_account_statistics",
             )
-            return False, str(e)
+            return False, err_msg
 
     async def run(self) -> tuple[bool, str]:
         await self.logger_msg(
-            msg=f"Starting the profile module...", 
-            type_msg="info", address=self.wallet_address
+            msg="Starting profile setup...",
+            type_msg="info",
+            address=self.wallet_address,
         )
-        error_messages = []
+        errors: list[str] = []
+
         try:
-            await self.logger_msg(
-                msg=f"Starting the onboarding process...", 
-                type_msg="info", address=self.wallet_address
-            )
+            # Authorize
             status, result = await self.onboarding()
             if not status:
-                await self.logger_msg(
-                    msg=f"Failed to authorize on Somnia", 
-                    type_msg="error", address=self.wallet_address, method_name="run"
-                )
-                return False, result
+                raise RuntimeError(result)
 
-            await self.logger_msg(
-                msg=f"Binding the referral code...", 
-                type_msg="info", address=self.wallet_address
-            )
+            # Bind referral
             if self.referral_code:
                 await self.referral_bind()
                 await random_sleep(self.wallet_address, **sleep_after_referral_bind)
 
-            await self.logger_msg(
-                msg=f"Getting the current user info...", 
-                type_msg="info", address=self.wallet_address
-            )
+            # Ensure user info
             null_fields = await self.get_me_info()
             if null_fields is None:
-                await self.logger_msg(
-                    msg=f"Profile setup completed successfully", 
-                    type_msg="success", address=self.wallet_address
-                )
-                return True, "Successfully got the current user info"
+                return True, "User profile is complete"
 
+            # Username
             if "username" in null_fields:
-                status, result = await self.create_username()
-                if not status:
-                    error_messages.append(result)
+                ok, msg = await self.create_username()
+                if not ok:
+                    errors.append(msg)
                 else:
-                    await random_sleep(self.wallet_address, **sleep_after_username_creation)
+                    await random_sleep(
+                        self.wallet_address,
+                        **sleep_after_username_creation,
+                    )
 
-            if not self.account.telegram_session:
-                error_messages.append("Telegram session not found")
+            # Telegram
             if "telegramName" in null_fields and self.account.telegram_session:
-                status, result = await self.connect_telegram_account()
-                if not status:
-                    error_messages.append(result)
+                ok, msg = await self.connect_telegram_account()
+                if not ok:
+                    errors.append(msg)
                 else:
-                    await random_sleep(self.wallet_address, **sleep_after_telegram_connection)
+                    await random_sleep(
+                        self.wallet_address,
+                        **sleep_after_telegram_connection,
+                    )
 
-            if not self.account.auth_tokens_discord:
-                error_messages.append("Discord auth tokens not found")
-            if "discordName" in null_fields and self.account.auth_tokens_discord:
-                status, result = await self.connect_discord_account()
-                if not status:
-                    error_messages.append(result)
+            # Discord
+            if (self.account.auth_tokens_discord
+                    and ("discordName" in null_fields or self.account.reconnect_discord)):
+                ok, msg = await self.connect_discord_account()
+                if not ok:
+                    errors.append(msg)
                 else:
-                    await random_sleep(self.wallet_address, **sleep_after_discord_connection)
+                    await random_sleep(
+                        self.wallet_address,
+                        **sleep_after_discord_connection,
+                    )
 
-            if not self.account.auth_tokens_twitter:
-                error_messages.append("Twitter auth tokens not found")
-            if "twitterName" in null_fields and self.account.auth_tokens_twitter:
-                status, result = await self.connect_twitter_account()
-                if not status:
-                    error_messages.append(result)
+            # Twitter
+            if (self.account.auth_tokens_twitter
+                    and ("twitterName" in null_fields or self.account.reconnect_twitter)):
+                ok, msg = await self.connect_twitter_account()
+                if not ok:
+                    errors.append(msg)
                 else:
-                    await random_sleep(self.wallet_address, **sleep_after_twitter_connection)
+                    await random_sleep(
+                        self.wallet_address,
+                        **sleep_after_twitter_connection,
+                    )
 
+            # Activate referral if needed
             referral_code = await self.get_me_info(get_referral_code=True)
             if referral_code is None:
-                status, result = await self.activate_referral()
-                if not status:
-                    error_messages.append(result)
+                ok, msg = await self.activate_referral()
+                if not ok:
+                    errors.append(msg)
 
-            if error_messages:
-                combined_error = "; ".join(error_messages)
-                return True, combined_error
-            else:
-                await self.logger_msg(
-                    msg=f"Profile setup completed successfully", 
-                    type_msg="success", address=self.wallet_address
-                )
-                return True, "Successfully setup profile"
+            if errors:
+                return True, "; ".join(errors)
+
+            await self.logger_msg(
+                msg="Profile setup completed successfully",
+                type_msg="success",
+                address=self.wallet_address,
+            )
+            return True, "Profile setup successful"
 
         except Exception as e:
+            err_msg = str(e)
             await self.logger_msg(
-                msg=f"Error in run method: {str(e)}", 
-                type_msg="error", address=self.wallet_address, method_name="run"
+                msg=f"Error in run: {err_msg}",
+                type_msg="error",
+                address=self.wallet_address,
+                method_name="run",
             )
-            return False, str(e)
+            return False, err_msg

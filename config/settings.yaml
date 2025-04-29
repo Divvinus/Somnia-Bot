@@ -1,8 +1,12 @@
 #------------------------------------------------------------------------------
+# en: GENERAL CONFIGURATION | ru: ОБЩАЯ КОНФИГУРАЦИЯ
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
 # en: Threading Configuration | ru: Конфигурация потоков
 #------------------------------------------------------------------------------
 # en: Controls parallel execution capacity (min: 1) | ru: Управление количеством параллельных выполнений (минимум: 1)
-threads: 10
+threads: 1
 
 #------------------------------------------------------------------------------
 # en: Timing Settings | ru: Настройки времени
@@ -10,43 +14,48 @@ threads: 10
 # en: Initial delay range before starting operations (seconds) | ru: Диапазон начальной задержки перед началом выполнения (секунды)
 delay_before_start:
     min: 10
-    max: 100
+    max: 15
 
 # en: Delay between tasks (seconds) | ru: Задержка между задачами (секунды)
 delay_between_tasks:
     min: 100
-    max: 300
+    max: 150
 
+#------------------------------------------------------------------------------
+# en: NETWORK CONFIGURATION | ru: КОНФИГУРАЦИЯ СЕТИ
+#------------------------------------------------------------------------------
+# en: Somnia Testnet RPC endpoint | ru: RPC-эндпоинт тестовой сети Somnia
+somnia_rpc: https://dream-rpc.somnia.network
 
+# en: Somnia Testnet Explorer | ru: Эксплорер тестовой сети Somnia
+somnia_explorer: https://shannon-explorer.somnia.network/
+
+#------------------------------------------------------------------------------
+# en: TELEGRAM CONFIGURATION | ru: КОНФИГУРАЦИЯ TELEGRAM
 #------------------------------------------------------------------------------
 # en: Telegram API hash and ID | ru: Telegram API hash и ID
-#------------------------------------------------------------------------------
 # https://my.telegram.org/apps 
-
 telegram_api_id: ""
 telegram_api_hash: ""
 
-# TELEGRAM DATA
+# en: Telegram notifications | ru: Уведомления Telegram
 send_stats_to_telegram: true
 
+# en: Bot token and user ID | ru: Токен бота и ID пользователя
 tg_token: ""  # https://t.me/BotFather
 tg_id: ""  # https://t.me/getmyid_bot
 
 #------------------------------------------------------------------------------
-# en: MODULES CONFIGURATION  | ru: КОНФИГУРАЦИИ МОДУЛЕЙ
+# en: TASK CONFIGURATION | ru: КОНФИГУРАЦИЯ ЗАДАЧ
 #------------------------------------------------------------------------------
 # en: Referral code for standard account registration | ru: Реферальный код для стандартной регистрации аккаунтов
 referral_code: ""
 
-
-#------------------------------------------------------------------------------
-# en: Task Execution Configuration | ru: Настройки выполнения задач
-#------------------------------------------------------------------------------
 # en: Tasks that will always run regardless of their status
 # ru: Задачи, которые будут выполняться всегда, независимо от их статуса
 always_run_tasks:
   # en: Module names to always run | ru: Имена модулей, задачи которых нужно выполнять всегда
-  modules: ["profile", "faucet", "mint_message_nft", "mint_air", "onchain_gm"]
+  modules: ["profile"]
 
 # en: Available module names (copy needed modules to the list above)
 # ru: Доступные имена модулей (скопируйте нужные модули в список выше)
@@ -76,17 +85,7 @@ available_modules:
   - "quest_masks_of_the_void" # Квест по Masks of the Void
 
 #------------------------------------------------------------------------------
-# Network Settings
-#------------------------------------------------------------------------------
-# Somnia Testnet RPC endpoint
-somnia_rpc: https://dream-rpc.somnia.network
-
-# Somnia Testnet Explorer
-somnia_explorer: https://shannon-explorer.somnia.network/
-
-
-#------------------------------------------------------------------------------
-# en: Tokens Configuration | ru: Конфигурация токенов
+# en: TOKEN CONFIGURATION | ru: КОНФИГУРАЦИЯ ТОКЕНОВ
 #------------------------------------------------------------------------------
 # en: Define tokens and their percentage ranges to be used in operations 
 # ru: Определение токенов и их процентных диапазонов для использования в операциях

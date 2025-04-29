@@ -19,6 +19,8 @@ class Account:
         'auth_tokens_twitter',
         'auth_tokens_discord',
         'telegram_session',
+        'reconnect_twitter',
+        'reconnect_discord',
     )
 
     def __init__(
@@ -28,12 +30,16 @@ class Account:
         auth_tokens_twitter: str | None = None,
         auth_tokens_discord: str | None = None,
         telegram_session: Path | None = None,
+        reconnect_twitter: bool | None = None,
+        reconnect_discord: bool | None = None,
     ) -> None:
         self.private_key = private_key
         self.proxy = proxy
         self.auth_tokens_twitter = auth_tokens_twitter
         self.auth_tokens_discord = auth_tokens_discord
         self.telegram_session = telegram_session
+        self.reconnect_twitter = reconnect_twitter
+        self.reconnect_discord = reconnect_discord
 
     def __repr__(self) -> str:
         return f'Account({self.private_key!r})'

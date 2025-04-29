@@ -11,24 +11,22 @@ import ua_generator
 from yarl import URL
 from better_proxy import Proxy
 
-from src.exceptions.custom_exceptions import APIError, ServerError, SessionRateLimited
-from src.logger import AsyncLogger
+from src.exceptions.api_exceptions import (
+    APIClientError, APIConnectionError, APITimeoutError, 
+    APIRateLimitError, APIResponseError, APIClientSideError, 
+    APIServerSideError, APISessionError, APISSLError
+)
 
 
-class HttpStatusError(APIError):
-    def __init__(self, message: str, status_code: int, response_data: Any = None) -> None:
-        super().__init__(message, response_data)
-        self.status_code: int = status_code
-        
-
-class BaseAPIClient(AsyncLogger):
+class BaseAPIClient:
     RETRYABLE_ERRORS = (
-        ServerError, 
-        SessionRateLimited,
+        APIServerSideError,
+        APIRateLimitError,
+        APITimeoutError,
         aiohttp.ClientError, 
         asyncio.TimeoutError,
         aiohttp.ClientSSLError,
-        HttpStatusError
+        APIResponseError
     )
     
     def __init__(
@@ -36,7 +34,6 @@ class BaseAPIClient(AsyncLogger):
         base_url: str, 
         proxy: Proxy | None = None
     ) -> None:
-        super().__init__()
         self.base_url: str = base_url
         self.proxy: Proxy | None = proxy
         self.session: aiohttp.ClientSession | None = None
@@ -78,12 +75,6 @@ class BaseAPIClient(AsyncLogger):
                 connector=self._connector,
                 headers=self._headers
             )
-            await self.logger_msg(
-                msg="Creating new session", 
-                type_msg="debug", 
-                class_name=self.__class__.__name__, 
-                method_name="_get_session"
-            )
         return self.session
 
     async def _check_session_valid(self) -> bool:
@@ -96,18 +87,8 @@ class BaseAPIClient(AsyncLogger):
             try:
                 await resource.close()
                 await asyncio.sleep(0.1)
-                await self.logger_msg(
-                    msg=f"{resource_name} closed", 
-                    type_msg="debug", 
-                    class_name=self.__class__.__name__,
-                    method_name="_safely_close_resource"
-                )
-            except Exception as e:
-                await self.logger_msg(
-                    msg=f"Error closing {resource_name}: {type(e).__name__}: {e}", 
-                    type_msg="warning", 
-                    method_name="_safely_close_resource"
-                )
+            except Exception:
+                pass
 
     async def __aenter__(self) -> Self:
         if not self._session_active:
@@ -138,17 +119,12 @@ class BaseAPIClient(AsyncLogger):
         ssl: bool | ssl_module.SSLContext = True,
         max_retries: int = 3,
         retry_delay: tuple[float, float] = (1.5, 5.0),
-        user_agent: str | None = None
+        user_agent: str | None = None,
+        timeout: float = 30.0
     ) -> dict[str, Any] | str:
         
         if not url and not method:
-            error_msg = "Either url or method must be provided"
-            await self.logger_msg(
-                msg=error_msg, 
-                type_msg="error", 
-                method_name="send_request"
-            )
-            return {"status_code": 400, "error": error_msg, "data": None, "text": ""}
+            raise APIClientError("Either url or method must be provided")
         
         if url:
             try:
@@ -178,11 +154,6 @@ class BaseAPIClient(AsyncLogger):
                 session = await self._get_session()
                 
                 if not await self._check_session_valid():
-                    await self.logger_msg(
-                        msg="Session was closed, recreating...", 
-                        type_msg="debug", 
-                        method_name="send_request"
-                    )
                     session = await self._get_session()
                 
                 merged_headers = dict(session.headers)
@@ -201,7 +172,8 @@ class BaseAPIClient(AsyncLogger):
                         proxy=self.proxy.as_url if self.proxy else None,
                         ssl=ssl_param,
                         allow_redirects=allow_redirects,
-                        raise_for_status=False
+                        raise_for_status=False,
+                        timeout=aiohttp.ClientTimeout(total=timeout)
                     ) as response:
                         content_type = response.headers.get('Content-Type', '').lower()
                         status_code = response.status
@@ -222,35 +194,38 @@ class BaseAPIClient(AsyncLogger):
                             
                         if verify:
                             if status_code == 429:
-                                raise SessionRateLimited(f"Too many requests: {status_code}", result)
+                                raise APIRateLimitError(f"Too many requests: {status_code}")
                             elif 400 <= status_code < 500:
-                                raise HttpStatusError(f"Client error: {status_code}", status_code, result)
+                                raise APIClientSideError(f"Client error: {status_code}", status_code, result)
                             elif status_code >= 500:
-                                raise ServerError(f"Server error: {status_code}", result)
+                                raise APIServerSideError(f"Server error: {status_code}", status_code, result)
                         
                         return result
                     
+                except asyncio.TimeoutError as e:
+                    if attempt < max_retries:
+                        delay = random.uniform(*retry_delay) * min(2 ** (attempt - 1), 30)
+                        await asyncio.sleep(delay)
+                        continue
+                    raise APITimeoutError(f"Request timed out after {timeout} seconds")
+                
+                except aiohttp.ServerTimeoutError as e:
+                    if attempt < max_retries:
+                        delay = random.uniform(*retry_delay) * min(2 ** (attempt - 1), 30)
+                        await asyncio.sleep(delay)
+                        continue
+                    raise APITimeoutError(f"Server timeout error: {e}")
+                        
                 except aiohttp.ClientSSLError as ssl_error:
-                    await self.logger_msg(
-                        msg=f"SSL Error: {ssl_error}. Resetting session...",
-                        type_msg="warning",
-                        method_name="send_request"
-                    )
                     await self.reset_session()
                     if attempt < max_retries:
                         delay = random.uniform(*retry_delay) * min(2 ** (attempt - 1), 30)
                         await asyncio.sleep(delay)
                         continue
-                    raise
+                    raise APISSLError(f"SSL Error: {ssl_error}")
                         
                 except RuntimeError as re:
                     if "Session is closed" in str(re):
-                        await self.logger_msg(
-                            msg="Session is closed, recreating for next attempt", 
-                            type_msg="warning", 
-                            method_name="send_request"
-                        )
-                        
                         if self.session and not self.session.closed:
                             await self._safely_close_resource(self.session, "Session")
                         self.session = None
@@ -259,32 +234,14 @@ class BaseAPIClient(AsyncLogger):
                             delay = random.uniform(*retry_delay) * min(2 ** (attempt - 1), 30)
                             await asyncio.sleep(delay)
                             continue
-                    raise
+                    raise APISessionError(f"Session error: {re}")
                     
                 except aiohttp.ClientConnectorError as e:
-                    await self.logger_msg(
-                        msg=f"Connection error: {e}", 
-                        type_msg="error", 
-                        method_name="send_request"
-                    )
-                    raise
+                    raise APIConnectionError(f"Connection error: {e}")
 
             except (aiohttp.ClientOSError, aiohttp.ServerDisconnectedError, RuntimeError) as e:
                 error_msg = str(e)
                 is_session_closed = isinstance(e, RuntimeError) and "Session is closed" in error_msg
-                
-                if is_session_closed:
-                    await self.logger_msg(
-                        msg=f"Session closed error: {e}. Recreating session", 
-                        type_msg="warning", 
-                        method_name="send_request"
-                    )
-                else:
-                    await self.logger_msg(
-                        msg=f"Connection disrupted: {e}. Resetting session", 
-                        type_msg="warning", 
-                        method_name="send_request"
-                    )
                 
                 if self.session and not self.session.closed:
                     await self._safely_close_resource(self.session, "Session")
@@ -294,43 +251,31 @@ class BaseAPIClient(AsyncLogger):
                     delay = random.uniform(*retry_delay) * min(2 ** (attempt - 1), 30)
                     await asyncio.sleep(delay)
                     continue
-                raise
+                
+                if is_session_closed:
+                    raise APISessionError(f"Session closed: {e}")
+                else:
+                    raise APIConnectionError(f"Connection disrupted: {e}")
 
             except self.RETRYABLE_ERRORS as error:
-                if isinstance(error, HttpStatusError) and getattr(error, 'status_code', 0) != 429:
-                    raise error
+                if isinstance(error, APIClientSideError):
+                    raise
                 
                 if attempt < max_retries:
                     delay = random.uniform(*retry_delay) * min(2 ** (attempt - 1), 30)
-                    
-                    if isinstance(error, SessionRateLimited):
-                        await self.logger_msg(
-                            msg=f"Rate limit error. Retry {attempt}/{max_retries} in {delay:.2f} seconds", 
-                            type_msg="debug", 
-                            method_name="send_request"
-                        )
-                    else:
-                        await self.logger_msg(
-                            msg=f"Error {type(error).__name__}: {error}. Retry {attempt}/{max_retries} after {delay:.2f} seconds", 
-                            type_msg="debug", 
-                            method_name="send_request"
-                        )
-                    
                     await asyncio.sleep(delay)
                     continue
                 
-                raise ServerError(
-                    f"The request failed after {max_retries} attempts to {target_url}. Error {error}"
-                ) from error
+                if isinstance(error, APIRateLimitError):
+                    raise
+                
+                raise APIServerSideError(
+                    f"The request failed after {max_retries} attempts to {target_url}",
+                    None,
+                    {"error": str(error)}
+                )
                     
             except Exception as error:
-                error_msg = f"Unexpected error when querying to {target_url}: {type(error).__name__}: {error}"
-                await self.logger_msg(
-                    msg=error_msg, 
-                    type_msg="error", 
-                    method_name="send_request"
-                )
-                
                 if attempt < max_retries:
                     delay = random.uniform(*retry_delay) * min(2 ** (attempt - 1), 30)
                     
@@ -341,15 +286,16 @@ class BaseAPIClient(AsyncLogger):
                     await asyncio.sleep(delay)
                     continue
                 
-                return {
-                    "status_code": 500, 
-                    "error": str(error), 
-                    "error_type": type(error).__name__,
-                    "data": None, 
-                    "text": error_msg
-                }
+                raise APIClientError(f"Unexpected error when querying to {target_url}: {type(error).__name__}: {error}")
 
-        raise ServerError(f"Unreachable code: all {max_retries} attempts have been exhausted")
+            except asyncio.TimeoutError:
+                if attempt < max_retries:
+                    delay = random.uniform(*retry_delay) * min(2 ** (attempt - 1), 30)
+                    await asyncio.sleep(delay)
+                    continue
+                raise APITimeoutError(f"Operation timed out after {timeout} seconds")
+
+        raise APIServerSideError(f"Unreachable code: all {max_retries} attempts have been exhausted")
 
     async def close(self) -> None:
         try:
@@ -362,34 +308,14 @@ class BaseAPIClient(AsyncLogger):
                 self._connector = None
             
             self._session_active = False
-            
-            await self.logger_msg(
-                msg=f"API client closed successfully", 
-                type_msg="debug", 
-                class_name=self.__class__.__name__, 
-                method_name="close"
-            )
         except Exception as e:
-            await self.logger_msg(
-                msg=f"Error during API client cleanup: {str(e)}", 
-                type_msg="error", 
-                class_name=self.__class__.__name__, 
-                method_name="close"
-            )
-            
             self.session = None
             self._connector = None
             self._session_active = False
+            raise APIClientError(f"Error during API client cleanup: {str(e)}")
 
     async def reset_session(self) -> None:
         if hasattr(self, 'session') and self.session:
             await self._safely_close_resource(self.session, "Session")
             self.session = None
             self._session_active = False
-        
-        await self.logger_msg(
-            msg="Session reset completed", 
-            type_msg="debug", 
-            class_name=self.__class__.__name__, 
-            method_name="reset_session"
-        )

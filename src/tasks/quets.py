@@ -34,7 +34,7 @@ class BaseQuestModule(SomniaClient, ABC):
         super().__init__(account)
         self.quest_config = quest_config
         self.profile_module: ProfileModule = ProfileModule(account)
-        self.quest_headers: dict[str, str] = self._get_base_headers(auth=True)
+        self.quest_headers: dict[str, str] = self._build_headers(auth=True)
         self.account: Account = account
 
     async def __aenter__(self) -> Self:
@@ -71,9 +71,9 @@ class BaseQuestModule(SomniaClient, ABC):
             response = await self.send_request(
                 request_type="GET",
                 method=f"/campaigns/{self.quest_config.campaign_id}",
-                headers=self._get_base_headers(
+                headers=self._build_headers(
                     auth=True,
-                    custom_referer=(
+                    referer=(
                         f"https://quest.somnia.network/campaigns/{self.quest_config.campaign_id}"
                     ),
                 ),
@@ -102,11 +102,18 @@ class BaseQuestModule(SomniaClient, ABC):
     ) -> tuple[bool, str | None]:
         if response is None or response.get("status_code") != 200:
             status_code = response.get("status_code", "N/A") if response else "N/A"
+            
+            if isinstance(response, dict) and response.get("error"):
+                error_details = f"API Error: {response.get('error')}"
+            else:
+                error_details = f"Code: {status_code}"
+                
             await self.logger.logger_msg(
-                msg=f"{error_msg} | Code: {status_code}", type_msg="error", 
-                address=self.wallet_address, class_name=self.__class__.__name__, method_name="_process_response"
+                msg=f"{error_msg} | {error_details}", 
+                type_msg="error", 
+                address=self.wallet_address
             )
-            return False, "http_error"
+            return False, f"http_error: {error_details}"
 
         response_data = response.get("data", {}) if response else {}
         if response_data and response_data.get("success"):
@@ -142,15 +149,43 @@ class BaseQuestModule(SomniaClient, ABC):
         response = await self.send_request(
             request_type="POST",
             method=endpoint,
-            headers=self._get_base_headers(auth=True),
+            headers=self._build_headers(auth=True),
             json_data=json_data,
         )
         return await self._process_response(response, success_msg, error_msg)
+
+    async def check_prerequisites(self) -> tuple[bool, str]:
+        required_tokens = []
+        
+        if any(handler.startswith("handle_twitter") for handler in self.quest_config.quest_handlers.values()):
+            required_tokens.append(("Twitter tokens", bool(self.account.auth_tokens_twitter)))
+            
+        if any(handler.startswith("handle_discord") or handler.endswith("discord") for handler in self.quest_config.quest_handlers.values()):
+            required_tokens.append(("Discord tokens", bool(self.account.auth_tokens_discord)))
+            
+        if any(handler.startswith("handle_telegram") for handler in self.quest_config.quest_handlers.values()):
+            required_tokens.append(("Telegram session", bool(self.account.telegram_session)))
+        
+        missing_tokens = [name for name, exists in required_tokens if not exists]
+        
+        if missing_tokens:
+            missing_str = ", ".join(missing_tokens)
+            return False, f"Missing: {missing_str}"
+        
+        return True, "All prerequisites met"
 
     async def run(self) -> tuple[bool, str]:
         try:
             class_name = self.__class__.__name__
             quest_name = class_name.replace("Module", "").replace("Quest", "")
+            
+            prereq_met, prereq_msg = await self.check_prerequisites()
+            if not prereq_met:
+                await self.logger.logger_msg(
+                    msg=f'Quest: "{quest_name}" cannot proceed - {prereq_msg}', 
+                    type_msg="error", address=self.wallet_address, class_name=class_name, method_name="run"
+                )
+                return False, f"Cannot proceed: {prereq_msg}"
             
             if not self.quest_config or not hasattr(self.quest_config, 'quest_handlers') or not self.quest_config.quest_handlers:
                 await self.logger.logger_msg(
@@ -221,6 +256,11 @@ class BaseQuestModule(SomniaClient, ABC):
                         
                     try:
                         success, error_code = await handler()
+                        await self.logger.logger_msg(
+                            msg=f'Quest ID {quest_id}, handler "{handler_name}": result {success}, error code {error_code}',
+                            type_msg="info" if success else "error", 
+                            address=self.wallet_address
+                        )
                         results.append(success)
                         
                         if error_code == "conditions_not_met":
@@ -270,18 +310,38 @@ class BaseQuestModule(SomniaClient, ABC):
 
     def safe_quest_handler(handler_func):
         async def wrapper(self, *args, **kwargs):
+            handler_name = handler_func.__name__
+            
+            if "twitter" in handler_name and not self.account.auth_tokens_twitter:
+                return False, "No Twitter auth tokens"
+                
+            if "discord" in handler_name and not self.account.auth_tokens_discord:
+                return False, "No Discord auth tokens"
+                
+            if "telegram" in handler_name and not self.account.telegram_session:
+                return False, "No Telegram session"
+            
             try:
-                return await handler_func(self, *args, **kwargs)
-            except Exception as e:
-                handler_name = handler_func.__name__
+                handler_type = handler_name.replace("handle_", "")
+                quest_desc = f"{handler_type.replace('_', ' ').title()}"
+                
                 await self.logger.logger_msg(
-                    msg=f"Error in {handler_name}: {str(e)}", 
+                    msg=f'Processing "{quest_desc}"', 
+                    type_msg="info", address=self.wallet_address
+                )
+                
+                return await handler_func(self, *args, **kwargs)
+                
+            except Exception as e:
+                error_msg = f"Error in {handler_name}: {str(e)}"
+                await self.logger.logger_msg(
+                    msg=error_msg, 
                     type_msg="error",
                     address=self.wallet_address, 
                     class_name=self.__class__.__name__, 
                     method_name=handler_name
                 )
-                return False, f"Error in {handler_name}: {str(e)}"
+                return False, error_msg
         return wrapper
 
 
@@ -299,10 +359,8 @@ class QuestSharingModule(BaseQuestModule):
             )
         )
 
+    @BaseQuestModule.safe_quest_handler
     async def handle_in_tx_hash(self) -> tuple[bool, str | None]:
-        await self.logger.logger_msg(
-            msg=f'Processing "Receive STT tokens"', type_msg="info", address=self.wallet_address
-        )
         _, tx_hash = await process_transfer_stt(self.account, me=True)
         await random_sleep(self.wallet_address, **sleep_between_tasks)
         return await self._send_tx_verification(
@@ -312,10 +370,8 @@ class QuestSharingModule(BaseQuestModule):
             error_msg="Failed to verify receiving STT tokens",
         )
 
+    @BaseQuestModule.safe_quest_handler
     async def handle_out_tx_hash(self) -> tuple[bool, str | None]:
-        await self.logger.logger_msg(
-            msg=f'Processing "Send STT tokens"', type_msg="info", address=self.wallet_address
-        )
         _, tx_hash = await process_transfer_stt(self.account)
         await random_sleep(self.wallet_address, **sleep_between_tasks)
         return await self._send_tx_verification(
@@ -325,10 +381,8 @@ class QuestSharingModule(BaseQuestModule):
             error_msg="Failed to verify sending STT tokens",
         )
 
+    @BaseQuestModule.safe_quest_handler
     async def handle_native_token(self) -> tuple[bool, str | None]:
-        await self.logger.logger_msg(
-            msg=f'Processing "Request STT tokens"', type_msg="info", address=self.wallet_address
-        )
         return await self._send_verification_request(
             quest_id=44,
             endpoint="/onchain/native-token", 
@@ -347,7 +401,7 @@ class QuestSharingModule(BaseQuestModule):
         response = await self.send_request(
             request_type="POST",
             method="/onchain/tx-hash", 
-            headers=self._get_base_headers(auth=True),
+            headers=self._build_headers(auth=True),
             json_data=json_data,
         )
         return await self._process_response(response, success_msg, error_msg)
@@ -1213,7 +1267,7 @@ class QuestMasksOfTheVoidModule(BaseQuestModule):
             )
         )
         
-    async def handle_twitter_follow_mulletcop(self) -> tuple[bool, str | None]:
+    async def handle_twitter_follow_masks(self) -> tuple[bool, str | None]:
         if not self.account.auth_tokens_twitter:
             return False, "No Twitter auth tokens"
         

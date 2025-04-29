@@ -35,6 +35,10 @@
   - Somnia Playground
   - Netherak Demons
   - Quest Gaming Frenzy
+  - Somnia Gaming Room
+  - Mullet Cop
+  - Intersection Cop
+  - Masks of the Void
 - Web3 modules
   - Faucet
   - Transfer STT

@@ -21,3 +21,4 @@ from .mint_air import MintairDeployContractModule
 from .onchain_gm import OnchainGMModule
 from .mint_nft import YappersNFTModule, ShannonNFTModule, NerzoNFTModule
 from .mint_domen import MintDomenModule
+from .check_native_balance import CheckNativeBalanceModule

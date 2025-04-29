@@ -121,9 +121,19 @@ class ConfigLoader:
                 if 'Twitter Token' in col_map 
                 else None
             )
+            reconnect_twitter = (
+                row[col_map.get('Reconnect Twitter')] 
+                if 'Reconnect Twitter' in col_map 
+                else None
+            )
             discord_token = (
                 row[col_map.get('Discord Token')] 
                 if 'Discord Token' in col_map 
+                else None
+            )
+            reconnect_discord = (
+                row[col_map.get('Reconnect Discord')] 
+                if 'Reconnect Discord' in col_map 
                 else None
             )
             
@@ -147,11 +157,13 @@ class ConfigLoader:
                     if twitter_token 
                     else None
                 ),
+                reconnect_twitter=reconnect_twitter,
                 auth_tokens_discord=(
                     str(discord_token).strip() 
                     if discord_token 
                     else None
                 ),
+                reconnect_discord=reconnect_discord,
                 telegram_session=session_path
             )
 

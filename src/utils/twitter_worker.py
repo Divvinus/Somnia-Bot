@@ -77,6 +77,11 @@ class TwitterWorker(Wallet, AsyncLogger):
 
             for attempt in range(3):
                 try:
+                    await self.logger_msg(
+                        msg=f"Retweet attempt {attempt+1}/3 for tweet ID: {tweet_id}", 
+                        type_msg="info", address=self.wallet_address
+                    )
+                    
                     query_id = client._ACTION_TO_QUERY_ID['CreateRetweet']
                     url = f"{client._GRAPHQL_URL}/{query_id}/CreateRetweet"
                     
@@ -142,6 +147,11 @@ class TwitterWorker(Wallet, AsyncLogger):
 
             for attempt in range(3):
                 try:
+                    await self.logger_msg(
+                        msg=f"Like attempt {attempt+1}/3 for tweet ID: {tweet_id}", 
+                        type_msg="info", address=self.wallet_address
+                    )
+                    
                     query_id = client._ACTION_TO_QUERY_ID.get('FavoriteTweet')
                     url = f"{client._GRAPHQL_URL}/{query_id}/FavoriteTweet"
                     
@@ -180,7 +190,7 @@ class TwitterWorker(Wallet, AsyncLogger):
                             return False
 
                         await self.logger_msg(
-                            msg=f"API error: {error_str}", 
+                            msg=f"Attempt {attempt+1}/3 failed. API error: {error_str}", 
                             type_msg="error", 
                             address=self.wallet_address, 
                             method_name="like_tweet"
@@ -223,6 +233,11 @@ class TwitterWorker(Wallet, AsyncLogger):
 
             for attempt in range(3):
                 try:
+                    await self.logger_msg(
+                        msg=f"Follow attempt {attempt+1}/3 for user ID: {user_id}", 
+                        type_msg="info", address=self.wallet_address
+                    )
+                    
                     url = "https://x.com/i/api/1.1/friendships/create.json"
                     data = {
                         "include_profile_interstitial_type": "1",
