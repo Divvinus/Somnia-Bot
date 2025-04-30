@@ -140,6 +140,12 @@ class NerzoNFTContract(BaseContract):
     abi_file: str = "claim_nft.json"
     
 @dataclass(slots=True)
+class SomniNFTContract(BaseContract):
+    address: str = AsyncWeb3.to_checksum_address("0xfA139F427a667b56d93946c2FD2c03601BaD033A")
+    abi_file: str = "claim_nft.json"
+    
+
+@dataclass(slots=True)
 class ZNSContract(BaseContract):
     address: str = AsyncWeb3.to_checksum_address("0xf180136DdC9e4F8c9b5A9FE59e2b1f07265C5D4D")
     abi_file: str = "zns_domen.json"

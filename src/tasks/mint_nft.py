@@ -4,7 +4,13 @@ from web3 import AsyncWeb3
 from src.wallet import Wallet
 from bot_loader import config
 from src.logger import AsyncLogger
-from src.models import Account, YappersNFTContract, ShannonNFTContract, NerzoNFTContract
+from src.models import (
+    Account, 
+    YappersNFTContract, 
+    ShannonNFTContract, 
+    NerzoNFTContract, 
+    SomniNFTContract
+)
 from src.utils.logger_trx import show_trx_log
 
 
@@ -97,3 +103,10 @@ class NerzoNFTModule(BaseNFTMintModule):
 
     def __init__(self, account: Account) -> None:
         super().__init__(account, NerzoNFTContract())
+        
+
+class SomniNFTModule(BaseNFTMintModule):
+    module_name = "Somni NFT"
+
+    def __init__(self, account: Account) -> None:
+        super().__init__(account, SomniNFTContract())

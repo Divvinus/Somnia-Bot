@@ -50,6 +50,8 @@
   - Onchain GM
   - Shannon NFT
   - Yappers NFT
+  - Nerzo NFT
+  - Somni NFT
 - Additional modules
   - Database Management
   - Account statistics monitoring

@@ -83,6 +83,9 @@ available_modules:
   - "quest_mullet"      # Квест по Mullet
   - "quest_intersection" # Квест по Intersection
   - "quest_masks_of_the_void" # Квест по Masks of the Void
+  - "quest_social_fi" # Квест по Social Fi
+  - "quest_qrusader" # Квест по QRusader
+  - "somni_nft" # Минт Somni NFT
 
 #------------------------------------------------------------------------------
 # en: TOKEN CONFIGURATION | ru: КОНФИГУРАЦИЯ ТОКЕНОВ

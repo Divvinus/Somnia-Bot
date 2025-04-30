@@ -15,10 +15,17 @@ from .quets import (
     QuestSomniaGamingRoomModule,
     QuestMulletCopModule,
     QuestIntersectionCopModule,
-    QuestMasksOfTheVoidModule
+    QuestMasksOfTheVoidModule,
+    QuestSocialFiModule,
+    QuestQRusaderModule
 )
 from .mint_air import MintairDeployContractModule
 from .onchain_gm import OnchainGMModule
-from .mint_nft import YappersNFTModule, ShannonNFTModule, NerzoNFTModule
+from .mint_nft import (
+    YappersNFTModule, 
+    ShannonNFTModule, 
+    NerzoNFTModule, 
+    SomniNFTModule
+)
 from .mint_domen import MintDomenModule
 from .check_native_balance import CheckNativeBalanceModule

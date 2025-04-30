@@ -84,6 +84,11 @@ class SomniaBot:
         async with NerzoNFTModule(account) as module:
             return await module.run()
     
+    @staticmethod
+    async def process_somni_nft(account: Account) -> tuple[bool, str]:
+        async with SomniNFTModule(account) as module:
+            return await module.run()
+        
     # === Onchain operations ===
     @staticmethod
     async def process_onchain_gm(account: Account) -> tuple[bool, str]:
@@ -159,4 +164,14 @@ class SomniaBot:
     @staticmethod
     async def process_quest_masks_of_the_void(account: Account) -> tuple[bool, str]:
         async with QuestMasksOfTheVoidModule(account) as module:
+            return await module.run()
+        
+    @staticmethod
+    async def process_quest_social_fi(account: Account) -> tuple[bool, str]:
+        async with QuestSocialFiModule(account) as module:
+            return await module.run()
+
+    @staticmethod
+    async def process_quest_qrusader(account: Account) -> tuple[bool, str]:
+        async with QuestQRusaderModule(account) as module:
             return await module.run()
