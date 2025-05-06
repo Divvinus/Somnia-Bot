@@ -51,6 +51,11 @@ class SomniaBot:
     async def process_check_native_balance(account: Account) -> tuple[bool, str]:
         async with CheckNativeBalanceModule(account, config.somnia_rpc) as module:
             return await module.check_native_balance()
+        
+    @staticmethod
+    async def process_daily_gm(account: Account) -> tuple[bool, str]:
+        async with GmModule(account) as module:
+            return await module.run()
 
     # === Minting tokens and Messages operations ===
     @staticmethod
@@ -116,61 +121,6 @@ class SomniaBot:
             return await module.run()
 
     # === Quests ===
-    @staticmethod
-    async def process_quest_socials(account: Account) -> tuple[bool, str]:
-        async with QuestSocialsModule(account) as module:
-            return await module.run()
-
-    @staticmethod
-    async def process_quest_sharing(account: Account) -> tuple[bool, str]:
-        async with QuestSharingModule(account) as module:
-            return await module.run()
-    
-    @staticmethod
-    async def process_quest_darktable(account: Account) -> tuple[bool, str]:
-        async with QuestDarktableModule(account) as module:
-            return await module.run()
-    
-    @staticmethod
-    async def process_quest_playground(account: Account) -> tuple[bool, str]:
-        async with QuestPlaygroundModule(account) as module:
-            return await module.run()
-        
-    @staticmethod
-    async def process_quest_demons(account: Account) -> tuple[bool, str]:
-        async with QuestDemonsModule(account) as module:
-            return await module.run()
-
-    @staticmethod
-    async def process_quest_gaming_frenzy(account: Account) -> tuple[bool, str]:
-        async with QuestGamingFrenzyModule(account) as module:
-            return await module.run()
-        
-    @staticmethod
-    async def process_quest_somnia_gaming_room(account: Account) -> tuple[bool, str]:
-        async with QuestSomniaGamingRoomModule(account) as module:
-            return await module.run()
-        
-    @staticmethod
-    async def process_quest_mullet(account: Account) -> tuple[bool, str]:
-        async with QuestMulletCopModule(account) as module:
-            return await module.run()
-        
-    @staticmethod
-    async def process_quest_intersection(account: Account) -> tuple[bool, str]:
-        async with QuestIntersectionCopModule(account) as module:
-            return await module.run()
-        
-    @staticmethod
-    async def process_quest_masks_of_the_void(account: Account) -> tuple[bool, str]:
-        async with QuestMasksOfTheVoidModule(account) as module:
-            return await module.run()
-        
-    @staticmethod
-    async def process_quest_social_fi(account: Account) -> tuple[bool, str]:
-        async with QuestSocialFiModule(account) as module:
-            return await module.run()
-
     @staticmethod
     async def process_quest_qrusader(account: Account) -> tuple[bool, str]:
         async with QuestQRusaderModule(account) as module:

@@ -6,17 +6,6 @@ from .ping_pong import MintPingPongModule, SwapPingPongModule
 from .mint_usdt import MintUsdtModule
 from .quills import QuillsMessageModule
 from .quets import (
-    QuestSharingModule,
-    QuestSocialsModule, 
-    QuestDarktableModule, 
-    QuestPlaygroundModule,
-    QuestDemonsModule,
-    QuestGamingFrenzyModule,
-    QuestSomniaGamingRoomModule,
-    QuestMulletCopModule,
-    QuestIntersectionCopModule,
-    QuestMasksOfTheVoidModule,
-    QuestSocialFiModule,
     QuestQRusaderModule
 )
 from .mint_air import MintairDeployContractModule
@@ -29,3 +18,4 @@ from .mint_nft import (
 )
 from .mint_domen import MintDomenModule
 from .check_native_balance import CheckNativeBalanceModule
+from .daily_gm import GmModule

@@ -29,16 +29,7 @@
   - Discord, Telegram, and Twitter connection
   - Account activation
 - Quest completion
-  - Somnia Testnet Odyssey - Social
-  - Somnia Testnet Odyssey - Sharing is Caring
-  - Darktable x Somnia
-  - Somnia Playground
-  - Netherak Demons
-  - Quest Gaming Frenzy
-  - Somnia Gaming Room
-  - Mullet Cop
-  - Intersection Cop
-  - Masks of the Void
+  - QRusader
 - Web3 modules
   - Faucet
   - Transfer STT
