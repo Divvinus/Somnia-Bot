@@ -121,3 +121,7 @@ class SomniaBot:
             return await module.run()
 
     # === Quests ===
+    @staticmethod
+    async def process_quest_yapper(account: Account) -> tuple[bool, str]:
+        async with QuestYappersModule(account) as module:
+            return await module.run()

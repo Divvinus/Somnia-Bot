@@ -75,6 +75,7 @@ available_modules:
   - "nerzo_nft"         # Nerzo NFT
   - "somni_nft"         # Минт Somni NFT
   - "daily_gm"          # Ежедневный GM
+  - "quest_yapper"      # Somnia Yappers
 
 #------------------------------------------------------------------------------
 # en: TOKEN CONFIGURATION | ru: КОНФИГУРАЦИЯ ТОКЕНОВ

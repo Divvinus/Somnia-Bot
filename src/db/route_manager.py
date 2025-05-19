@@ -31,7 +31,8 @@ class RouteManager:
         "mint_domen",
         "nerzo_nft",
         "somni_nft",
-        "daily_gm"
+        "daily_gm",
+        "quest_yapper"
     ]
 
     DEPENDENCIES: dict[str, list[str]] = {
@@ -49,7 +50,8 @@ class RouteManager:
         "mint_domen": ["faucet"],
         "nerzo_nft": ["faucet"],
         "somni_nft": ["faucet"],
-        "daily_gm": ["profile"]
+        "daily_gm": ["profile"],
+        "quest_yapper": ["profile"]        
     }
     
     @staticmethod
