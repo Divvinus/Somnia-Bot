@@ -55,7 +55,7 @@ referral_code: ""
 # ru: Задачи, которые будут выполняться всегда, независимо от их статуса
 always_run_tasks:
   # en: Module names to always run | ru: Имена модулей, задачи которых нужно выполнять всегда
-  modules: ["profile"]
+  modules: ["faucet", "transfer_stt", "mint_message_nft", "onchain_gm", "daily_gm"]
 
 # en: Available module names (copy needed modules to the list above)
 # ru: Доступные имена модулей (скопируйте нужные модули в список выше)
@@ -63,9 +63,9 @@ available_modules:
   - "profile"           # Профиль
   - "faucet"            # Кран для получения токенов
   - "transfer_stt"      # Перевод STT
+  - "mint_usdt"         # Минт USDT
   - "mint_ping_pong"    # Минт Ping/Pong
   - "swap_ping_pong"    # Обмен Ping/Pong
-  - "mint_usdt"         # Минт USDT
   - "mint_message_nft"  # Минт NFT сообщения
   - "mint_air"          # Минт контракта токена
   - "onchain_gm"        # Onchain GM
@@ -73,8 +73,8 @@ available_modules:
   - "yappers_nft"       # Yappers NFT
   - "mint_domen"        # Минт домена
   - "nerzo_nft"         # Nerzo NFT
-  - "quest_qrusader" # Квест по QRusader
-  - "somni_nft" # Минт Somni NFT
+  - "somni_nft"         # Минт Somni NFT
+  - "daily_gm"          # Ежедневный GM
 
 #------------------------------------------------------------------------------
 # en: TOKEN CONFIGURATION | ru: КОНФИГУРАЦИЯ ТОКЕНОВ

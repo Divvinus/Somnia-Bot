@@ -121,7 +121,3 @@ class SomniaBot:
             return await module.run()
 
     # === Quests ===
-    @staticmethod
-    async def process_quest_qrusader(account: Account) -> tuple[bool, str]:
-        async with QuestQRusaderModule(account) as module:
-            return await module.run()
