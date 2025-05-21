@@ -8,20 +8,18 @@ from src.api import BaseAPIClient
 from src.wallet import Wallet
 from src.logger import AsyncLogger
 from src.models import Account, ZNSContract
-from src.utils import show_trx_log
+from src.utils import show_trx_log, random_sleep
 from bot_loader import config
+from config.settings import MAX_RETRY_ATTEMPTS, RETRY_SLEEP_RANGE
 
 
 class MintDomenModule(Wallet, AsyncLogger):
     def __init__(self, account: Account) -> None:
         Wallet.__init__(self, account.private_key, config.somnia_rpc, account.proxy)
         AsyncLogger.__init__(self)
-        
         self.api_client = BaseAPIClient(
-            base_url="https://contracts-api.mintair.xyz/api",
-            proxy=account.proxy
-        )
-        
+            "https://contracts-api.mintair.xyz/api", account.proxy
+        )        
         self.faker = Faker()
         
     async def __aenter__(self) -> Self:
@@ -35,9 +33,7 @@ class MintDomenModule(Wallet, AsyncLogger):
                 await self.api_client.__aexit__(exc_type, exc_val, exc_tb)
             except Exception as e:
                 await self.logger_msg(
-                    msg=f"Error closing API client: {str(e)}", 
-                    type_msg="error", 
-                    address=self.wallet_address
+                    f"Error closing API client: {str(e)}", "error", self.wallet_address
                 )
         await Wallet.__aexit__(self, exc_type, exc_val, exc_tb)
 
@@ -50,11 +46,7 @@ class MintDomenModule(Wallet, AsyncLogger):
             
     async def register_domain(self, name: str) -> tuple[bool, str]:
         try:
-            await self.logger_msg(
-                msg="Minting domain...",
-                type_msg="info",
-                address=self.wallet_address
-            )
+            await self.logger_msg("Minting domain...", "info", self.wallet_address)
 
             contract = await self.get_contract(ZNSContract())
             
@@ -65,11 +57,8 @@ class MintDomenModule(Wallet, AsyncLogger):
             if balance < price:
                 balance_eth = self.from_wei(balance, 'ether')
                 price_eth = self.from_wei(price, 'ether')
-                await self.logger_msg(
-                    msg=f"Insufficient balance for mint domen. Balance: {balance_eth:.6f} ETH, Price: {price_eth:.6f} ETH",
-                    type_msg="error",
-                    address=self.wallet_address
-                )
+                error_msg = f"Insufficient balance for mint domen. Balance: {balance_eth:.6f} ETH, Price: {price_eth:.6f} ETH"
+                await self.logger_msg(error_msg, "error", self.wallet_address)
                 return False, "Insufficient balance"
 
             tx_params = await self.build_transaction_params(
@@ -85,12 +74,8 @@ class MintDomenModule(Wallet, AsyncLogger):
             
             result, tx_hash = await self._process_transaction(tx_params)
             if not result:
-                await self.logger_msg(
-                    msg=f"Transaction failed: {tx_hash}",
-                    type_msg="error",
-                    address=self.wallet_address,
-                    method_name="register_domain"
-                )
+                error_msg = f"Transaction failed: {tx_hash}"
+                await self.logger_msg(error_msg, "error", self.wallet_address)
                 return False, tx_hash
 
             return True, tx_hash
@@ -98,68 +83,36 @@ class MintDomenModule(Wallet, AsyncLogger):
         except Exception as e:
             error_str = str(e)
             if '0x3a81d6fc' in error_str:
-                await self.logger_msg(
-                    msg=f"Domain '{name}' already registered",
-                    type_msg="warning",
-                    address=self.wallet_address,
-                    method_name="register_domain"
-                )
+                error_msg = f"Domain '{name}' already registered"
+                await self.logger_msg(error_msg, "warning", self.wallet_address, "register_domain")
                 return False, "domain_already_registered"
             else:
                 error_msg = f"Unexpected error: {error_str}"
-                await self.logger_msg(
-                    msg=error_msg,
-                    type_msg="error",
-                    address=self.wallet_address,
-                    method_name="register_domain"
-                )
+                await self.logger_msg(error_msg, "error", self.wallet_address, "register_domain")
                 return False, error_msg
 
     async def run(self) -> tuple[bool, str]:
-        try:
-            max_attempts = 3
-            attempt = 0
-            
-            while attempt < max_attempts:
-                attempt += 1
+        for attempt in range(MAX_RETRY_ATTEMPTS):
+            try:
                 name = await self.generate_domain_name()
                 
                 await self.logger_msg(
-                    msg=f"Attempt {attempt}/{max_attempts}: registering domain '{name}'",
-                    type_msg="info",
-                    address=self.wallet_address
+                    f"Attempt {attempt}/{MAX_RETRY_ATTEMPTS}: registering domain '{name}'", "info", self.wallet_address
                 )
                 
                 status, result = await self.register_domain(name)
                 
                 if status or result != "domain_already_registered":
                     await show_trx_log(
-                        self.wallet_address,
-                        f"Register domain: {name}",
-                        status,
-                        result
+                        self.wallet_address, f"Register domain: {name}", status, result
                     )
                     return status, "Success" if status else result
                 
-                if attempt < max_attempts:
-                    await self.logger_msg(
-                        msg=f"Trying another domain name...",
-                        type_msg="info",
-                        address=self.wallet_address
-                    )
+                if attempt < MAX_RETRY_ATTEMPTS:
+                    await self.logger_msg(f"Trying another domain name...", "info", self.wallet_address)
+            except Exception as e:
+                error_msg = f"Error: {str(e)}"
+                await self.logger_msg(error_msg, "error", self.wallet_address, "run")
+                return False, str(e)
             
-            await self.logger_msg(
-                msg=f"Failed to register domain after {max_attempts} attempts",
-                type_msg="error",
-                address=self.wallet_address
-            )
-            return False, f"Failed to register domain after {max_attempts} attempts"
-
-        except Exception as e:
-            await self.logger_msg(
-                msg=f"Critical error: {str(e)}",
-                type_msg="critical",
-                address=self.wallet_address,
-                method_name="run"
-            )
-            return False, str(e)
+        return False, f"Failed to register domain after {MAX_RETRY_ATTEMPTS} attempts"

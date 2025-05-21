@@ -8,7 +8,8 @@ from typing import Self
 from src.wallet import Wallet
 from src.logger import AsyncLogger
 from src.models import Account
-from src.utils.logger_trx import show_trx_log
+from src.utils import show_trx_log, random_sleep
+from config.settings import MAX_RETRY_ATTEMPTS, RETRY_SLEEP_RANGE
 
 
 class TransferSTTModule(Wallet, AsyncLogger):
@@ -42,46 +43,50 @@ class TransferSTTModule(Wallet, AsyncLogger):
         return False, "Not enough balance"
 
     async def transfer_stt(self) -> tuple[bool, str]:
-        await self.logger_msg(
-            msg=f"Processing transfer_stt...", type_msg="info", 
-            address=self.wallet_address
-        )
-
+        await self.logger_msg(f"Processing transfer_stt...", "info", self.wallet_address)
+        error_messages = []
+        
         try:
             balance = await self.human_balance()
             status, amount = self._calculate_transfer_amount(balance)
             if not status:
-                await self.logger_msg(
-                    msg=f"Account {self.wallet_address} | {amount}", 
-                    type_msg="error", method_name="transfer_stt"
-                )
+                await self.logger_msg(amount, "error", self.wallet_address, "transfer_stt")
                 return status, amount
 
             to_address = (
                 self.wallet_address if self.me 
                 else self.generate_eth_address()
             )
-            
-            tx_params = await self.build_transaction_params(
-                to=to_address,
-                value=self.to_wei(amount, "ether")
-            )
-
-            status, tx_hash = await self._process_transaction(tx_params)
-
-            await show_trx_log(
-                self.wallet_address,
-                f"Transfer {amount} STT to {to_address}",
-                status,
-                tx_hash
-            )
-
-            return (True, tx_hash) if status else (False, f"Transaction failed: {tx_hash}")
-
         except Exception as error:
-            error_msg = f"Error in transfer_stt: {str(error)}"
-            await self.logger_msg(
-                msg=f"Account {self.wallet_address} | {error_msg}", 
-                type_msg="error", method_name="transfer_stt"
-            )
+            error_msg = f"Error:{str(error)}"
+            await self.logger_msg(error_msg, "error", self.wallet_address, "transfer_stt")
             return False, error_msg
+
+        for attempt in range(MAX_RETRY_ATTEMPTS):
+            try:
+                await self.logger_msg(f"Transfer attempt {attempt+1}/{MAX_RETRY_ATTEMPTS}", "info", self.wallet_address)
+                
+                tx_params = await self.build_transaction_params(
+                    to=to_address,
+                    value=self.to_wei(amount, "ether")
+                )
+
+                status, tx_hash = await self._process_transaction(tx_params)
+
+                if status:
+                    await show_trx_log(self.wallet_address, f"Transfer {amount} STT to {to_address}", status, tx_hash)
+                    return status, tx_hash
+                    
+                error_msg = f"Transaction failed: {tx_hash}"
+                error_messages.append(error_msg)
+                await self.logger_msg(error_msg, "error", self.wallet_address, "transfer_stt")
+
+            except Exception as error:
+                error_msg = f"Attempt {attempt+1} error: {str(error)}"
+                error_messages.append(error_msg)
+                await self.logger_msg(error_msg, "error", self.wallet_address, "transfer_stt")
+
+            if attempt < MAX_RETRY_ATTEMPTS - 1:
+                await random_sleep(self.wallet_address, *RETRY_SLEEP_RANGE)
+                
+        return False, f"Transfer failed after {MAX_RETRY_ATTEMPTS} attempts. Errors:\n" + "\n".join(error_messages)

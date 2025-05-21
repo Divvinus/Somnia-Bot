@@ -76,6 +76,7 @@ available_modules:
   - "somni_nft"         # Минт Somni NFT
   - "daily_gm"          # Ежедневный GM
   - "quest_yapper"      # Somnia Yappers
+  - "community_nft"     # Community NFT
 
 #------------------------------------------------------------------------------
 # en: TOKEN CONFIGURATION | ru: КОНФИГУРАЦИЯ ТОКЕНОВ

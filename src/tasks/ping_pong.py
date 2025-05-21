@@ -14,6 +14,7 @@ from src.models import (
     PingPongRouterContract,
 )
 from src.utils import show_trx_log, random_sleep
+from config.settings import MAX_RETRY_ATTEMPTS, RETRY_SLEEP_RANGE
 
 
 class MintPingPongModule(Wallet, AsyncLogger):
@@ -34,32 +35,32 @@ class MintPingPongModule(Wallet, AsyncLogger):
         token_name: str,
     ) -> tuple[bool, str | dict]:
         await self.logger_msg(
-            msg=f"Account {self.wallet_address} | Processing mint {token_name}...", 
-            type_msg="info", address=self.wallet_address
+            f"Account {self.wallet_address} | Processing mint {token_name}...", "info", self.wallet_address
         )
 
-        try:
-            contract: AsyncContract = await self.get_contract(contract_model)
-            balance = await contract.functions.balanceOf(self.wallet_address).call()
+        for attempt in range(MAX_RETRY_ATTEMPTS):
+            try:
+                contract: AsyncContract = await self.get_contract(contract_model)
+                balance = await contract.functions.balanceOf(self.wallet_address).call()
 
-            if balance > 0:
-                msg = f"Tokens {token_name} already minted"
+                if balance > 0:
+                    msg = f"Tokens {token_name} already minted"
+                    await self.logger_msg(msg=msg, type_msg="success", address=self.wallet_address)
+                    return True, "already_minted"
+
+                tx_params = await self.build_transaction_params(contract.functions.mint())
+                return await self._process_transaction(tx_params)
+
+            except Exception as error:
+                error_msg = f"Error: {str(error)}"
                 await self.logger_msg(
-                    msg=msg, type_msg="success", address=self.wallet_address
+                    error_msg, "error", self.wallet_address, "_mint_tokens"
                 )
-                return True, "already_minted"
-
-            tx_params = await self.build_transaction_params(
-                contract.functions.mint()
-            )
-            return await self._process_transaction(tx_params)
-
-        except Exception as error:
-            await self.logger_msg(
-                msg=f"Error: {error!s}", type_msg="error", address=self.wallet_address, 
-                method_name="_mint_tokens"
-            )
-            return False, str(error)
+                if attempt == MAX_RETRY_ATTEMPTS - 1:
+                    return False, error_msg
+                await random_sleep(self.wallet_address, *RETRY_SLEEP_RANGE)
+                
+        return False, f"Failed mint Ping/Pong after {MAX_RETRY_ATTEMPTS} attempts"
 
     async def run(self) -> bool:
         contracts = [
@@ -74,17 +75,14 @@ class MintPingPongModule(Wallet, AsyncLogger):
 
             if "ACCOUNT_DOES_NOT_EXIST" in result:
                 await self.logger_msg(
-                    msg=f"First register an account with the Somnia project, then come back and mint NFTs", 
-                    type_msg="warning", address=self.wallet_address, method_name="run"
+                    f"First register an account with the Somnia project, then come back and mint NFTs", 
+                    "warning", self.wallet_address, "run"
                 )
                 return status, result
 
             if result != "already_minted":
                 await show_trx_log(
-                    self.wallet_address,
-                    f"Mint {token_name}",
-                    status,
-                    result
+                    self.wallet_address, f"Mint {token_name}", status, result
                 )
 
             if status:
@@ -96,8 +94,7 @@ class MintPingPongModule(Wallet, AsyncLogger):
                 success_count += 1
             else:
                 await self.logger_msg(
-                    msg=f"Failed to mint {token_name}", 
-                    type_msg="warning", address=self.wallet_address, method_name="run"
+                    f"Failed to mint {token_name}", "warning", self.wallet_address, "run"
                 )
 
         if success_count == len(contracts):
@@ -106,13 +103,8 @@ class MintPingPongModule(Wallet, AsyncLogger):
 
 
 class SwapPingPongModule(Wallet, AsyncLogger):
-    def __init__(self, account: Account, rpc_url: str) -> None:
-        Wallet.__init__(
-            self, 
-            account.private_key, 
-            config.somnia_rpc, 
-            account.proxy
-        )
+    def __init__(self, account: Account) -> None:
+        Wallet.__init__(self, account.private_key, config.somnia_rpc, account.proxy)
         AsyncLogger.__init__(self)
 
     async def __aenter__(self) -> Self:
@@ -131,8 +123,8 @@ class SwapPingPongModule(Wallet, AsyncLogger):
 
         if balance <= 0 or balance is None:
             await self.logger_msg(
-                msg=f'You do not have the tokens for the "{token_name}" swap', 
-                type_msg="warning", address=self.wallet_address, method_name="_calculate_amount"
+                f'You do not have the tokens for the "{token_name}" swap', 
+                "warning", self.wallet_address, "_calculate_amount"
             )
             return False
 
@@ -148,8 +140,8 @@ class SwapPingPongModule(Wallet, AsyncLogger):
         amount_to_swap: int,
     ) -> tuple[bool, str]:
         await self.logger_msg(
-            msg=f"Approve {self.from_wei(amount_to_swap, 'ether')} tokens {token_in_name}", 
-            type_msg="info", address=self.wallet_address
+            f"Approve {self.from_wei(amount_to_swap, 'ether')} tokens {token_in_name}", 
+            "info", self.wallet_address
         )
 
         router_address = PingPongRouterContract().address
@@ -165,51 +157,53 @@ class SwapPingPongModule(Wallet, AsyncLogger):
         token_out_contract: PingTokensContract | PongTokensContract,
         token_out_name: str,
     ) -> tuple[bool, str]:
-        await self.logger_msg(
-            msg=f"Processing swap...", 
-            type_msg="info", address=self.wallet_address
-        )
+        await self.logger_msg(f"Processing swap...", "info", self.wallet_address)
 
-        try:
-            amount_to_swap = await self._calculate_amount(token_in_contract, token_in_name)
-            if not amount_to_swap:
-                return False, "insufficient_balance"
+        for attempt in range(MAX_RETRY_ATTEMPTS):
+            try:
+                amount_to_swap = await self._calculate_amount(token_in_contract, token_in_name)
+                if not amount_to_swap:
+                    return False, "insufficient_balance"
 
-            approved, result = await self._approve_tokens(
-                token_in_contract, token_in_name, amount_to_swap
-            )
-            if not approved:
-                return approved, result
+                approved, result = await self._approve_tokens(
+                    token_in_contract, token_in_name, amount_to_swap
+                )
+                if not approved:
+                    return approved, result
 
-            router_contract = await self.get_contract(PingPongRouterContract())
-            params = (
-                token_in_contract.address,
-                token_out_contract.address,
-                500,
-                self.wallet_address,
-                amount_to_swap,
-                0,
-                0,
-            )
-            
-            tx_params = await self.build_transaction_params(
-                router_contract.functions.exactInputSingle(params)
-            )
-            
-            await self.logger_msg(
-                msg=f"Swap {self.from_wei(amount_to_swap, 'ether')} "
-                f"{token_in_name} to {token_out_name}", 
-                type_msg="info", address=self.wallet_address
-            )
-            
-            return await self._process_transaction(tx_params)
+                router_contract = await self.get_contract(PingPongRouterContract())
+                params = (
+                    token_in_contract.address,
+                    token_out_contract.address,
+                    500,
+                    self.wallet_address,
+                    amount_to_swap,
+                    0,
+                    0,
+                )
+                
+                tx_params = await self.build_transaction_params(
+                    router_contract.functions.exactInputSingle(params)
+                )
+                
+                await self.logger_msg(
+                    f"Swap {self.from_wei(amount_to_swap, 'ether')} "
+                    f"{token_in_name} to {token_out_name}", 
+                    "info", self.wallet_address
+                )
+                
+                return await self._process_transaction(tx_params)
 
-        except Exception as error:
-            await self.logger_msg(
-                msg=f"Error: {error!s}", type_msg="error", address=self.wallet_address, 
-                method_name="_swap_tokens"
-            )
-            return False, str(error)
+            except Exception as error:
+                error_msg = f"Error: {error}"
+                await self.logger_msg(
+                    error_msg, "error", self.wallet_address, "_swap_tokens"
+                )
+                if attempt == MAX_RETRY_ATTEMPTS - 1:
+                    return False, error_msg
+                await random_sleep(self.wallet_address, *RETRY_SLEEP_RANGE)
+        
+        return False, f"Failed swap Ping/Pong after {MAX_RETRY_ATTEMPTS} attempts"
 
     async def run(self) -> bool:
         contracts = [
@@ -231,8 +225,8 @@ class SwapPingPongModule(Wallet, AsyncLogger):
 
             if "ACCOUNT_DOES_NOT_EXIST" in result:
                 await self.logger_msg(
-                    msg=f"First register an account with the Somnia project", 
-                    type_msg="warning", address=self.wallet_address, method_name="run"
+                    f"First register an account with the Somnia project", 
+                    "warning", self.wallet_address, "run"
                 )
                 return status, result
 
@@ -253,8 +247,7 @@ class SwapPingPongModule(Wallet, AsyncLogger):
                 success_count += 1
             else:
                 await self.logger_msg(
-                    msg=f"Failed swap {token_in_name}. Error: {result}", 
-                    type_msg="warning", address=self.wallet_address, method_name="run"
+                    f"Failed swap {token_in_name}. Error: {result}", "warning", self.wallet_address, "run"
                 )
 
         if success_count == len(contracts):

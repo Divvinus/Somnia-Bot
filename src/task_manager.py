@@ -94,6 +94,11 @@ class SomniaBot:
         async with SomniNFTModule(account) as module:
             return await module.run()
         
+    @staticmethod
+    async def process_community_nft(account: Account) -> tuple[bool, str]:
+        async with CommunityNFTModule(account) as module:
+            return await module.run()
+        
     # === Onchain operations ===
     @staticmethod
     async def process_onchain_gm(account: Account) -> tuple[bool, str]:
@@ -102,7 +107,7 @@ class SomniaBot:
         
     @staticmethod
     async def process_swap_ping_pong(account: Account) -> tuple[bool, str]:
-        async with SwapPingPongModule(account, config.somnia_rpc) as module:
+        async with SwapPingPongModule(account) as module:
             return await module.run()
         
     @staticmethod

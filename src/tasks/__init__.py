@@ -14,7 +14,8 @@ from .mint_nft import (
     YappersNFTModule, 
     ShannonNFTModule, 
     NerzoNFTModule, 
-    SomniNFTModule
+    SomniNFTModule,
+    CommunityNFTModule
 )
 from .mint_domen import MintDomenModule
 from .check_native_balance import CheckNativeBalanceModule

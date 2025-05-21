@@ -3,6 +3,8 @@ from typing import Self
 from src.api import SomniaClient, BaseAPIClient
 from src.logger import AsyncLogger
 from src.models import Account
+from src.utils import random_sleep
+from config.settings import MAX_RETRY_ATTEMPTS, RETRY_SLEEP_RANGE
 
 
 class GmModule(SomniaClient, AsyncLogger):
@@ -46,11 +48,7 @@ class GmModule(SomniaClient, AsyncLogger):
         await self._api.__aexit__(*args)
         
     async def run(self) -> tuple[bool, str]:
-        await self.logger_msg(
-            msg="I'm doing it Daily GM",
-            address=self.wallet_address,
-            type_msg="info"
-        )
+        await self.logger_msg("I'm doing it Daily GM", "info", self.wallet_address)
         
         status, result = await self.onboarding()
         if not status:
@@ -61,27 +59,31 @@ class GmModule(SomniaClient, AsyncLogger):
             "referer": "https://quest.somnia.network/account",
         }
 
-        response = await self._api.send_request(
-            request_type="POST",
-            method="/users/gm",
-            headers=headers,
-            verify=False
-        )
-        status = response.get("status_code")
+        for attempt in range(MAX_RETRY_ATTEMPTS):
+            try:
+                response = await self._api.send_request(
+                    request_type="POST",
+                    method="/users/gm",
+                    headers=headers,
+                    verify=False
+                )
+                status = response.get("status_code")
+                
+                if status == 200:
+                    await self.logger_msg(f"Successfully executed Daily GM", "success", self.wallet_address)
+                    return True, "Successfully executed Daily GM"
+                
+                await self.logger_msg(f"Failed executed Daily GM", "error", self.wallet_address)
+                
+                if attempt == MAX_RETRY_ATTEMPTS - 1:
+                    return False, "Failed executed Daily GM"
+                await random_sleep(self.wallet_address, *RETRY_SLEEP_RANGE)
+            
+            except Exception as e:
+                error_msg = f"Error executing Daily GM: {str(e)}"
+                await self.logger_msg(error_msg, "error", self.wallet_address)
+                if attempt == MAX_RETRY_ATTEMPTS - 1:
+                    return False, error_msg
+                await random_sleep(self.wallet_address, *RETRY_SLEEP_RANGE)
         
-        if status == 200:
-            await self.logger_msg(
-                msg=f"Successfully executed Daily GM",
-                type_msg="success",
-                address=self.wallet_address,
-            )
-            return True, "Successfully executed Daily GM"
-        
-        await self.logger_msg(
-            msg=f"Failed executed Daily GM",
-            type_msg="error",
-            address=self.wallet_address,
-        )
-        return False, "Failed executed Daily GM"
-        
-        
+        return False, f"Failed executed Daily GM after {MAX_RETRY_ATTEMPTS} attempts"

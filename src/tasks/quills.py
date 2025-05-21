@@ -7,6 +7,7 @@ from src.api import BaseAPIClient
 from src.wallet import Wallet
 from src.models import Account
 from src.utils import random_sleep
+from config.settings import MAX_RETRY_ATTEMPTS, RETRY_SLEEP_RANGE
 
 
 def _get_headers() -> dict[str, str]:
@@ -28,8 +29,7 @@ def _get_headers() -> dict[str, str]:
 class QuillsMessageModule(Wallet, AsyncLogger):
     def __init__(self, account: Account):
         Wallet.__init__(self, account.private_key, account.proxy)
-        AsyncLogger.__init__(self)
-        
+        AsyncLogger.__init__(self)        
         self._api = BaseAPIClient(base_url="https://quills.fun/api", proxy=account.proxy)
         self.fake = Faker()
     
@@ -51,66 +51,78 @@ class QuillsMessageModule(Wallet, AsyncLogger):
             try:
                 await self._api.__aexit__(exc_type, exc_val, exc_tb)
             except Exception as e:
-                await self.logger_msg(
-                    msg=f"Error closing API client: {str(e)}", 
-                    type_msg="error", 
-                    address=self.wallet_address
-                )
+                await self.logger_msg(f"Error closing API client: {str(e)}", "error", self.wallet_address)
         await Wallet.__aexit__(self, exc_type, exc_val, exc_tb)
     
     async def _process_api_response(self, response: dict, operation_name: str) -> tuple[bool, str]:
         if not response:
-            await self.logger_msg(
-                msg=f"Empty response during {operation_name}", 
-                type_msg="error", address=self.wallet_address, method_name="_process_api_response"
-            )
-            return False, "Empty response"
+            error_msg = f"Empty response during {operation_name}"
+            await self.logger_msg(error_msg, "error", self.wallet_address, "_process_api_response")
+            return False, error_msg
             
         if response.get("data", {}).get("success"):
-            await self.logger_msg(
-                msg=f"Successfully {operation_name}", 
-                type_msg="success", address=self.wallet_address
-            )
-            return True, "Successfully completed operation"
+            success_msg = f"Successfully {operation_name}"
+            await self.logger_msg(success_msg, "success", self.wallet_address)
+            return True, success_msg
         
         else:
-            await self.logger_msg(
-                msg=f"Unknown error during {operation_name}. Response: {response}", 
-                type_msg="error", address=self.wallet_address, method_name="_process_api_response"
-            )
-            return False, "Unknown error"
+            error_msg = f"Unknown error during {operation_name}. Response: {response}"
+            await self.logger_msg(error_msg, "error", self.wallet_address, "_process_api_response")
+            return False, error_msg
     
     async def auth(self) -> tuple[bool, str]:
-        await self.logger_msg(
-            msg=f"Beginning the authorization process on the site quills.fun...", 
-            type_msg="info", address=self.wallet_address
-        )
+        await self.logger_msg("Starting authorization on the quills.fun...", "info", self.wallet_address)
+        error_messages = []
         
-        message = f"I accept the Quills Adventure Terms of Service at https://quills.fun/terms\n\nNonce: {int(time.time() * 1000)}"
-        signature = await self.get_signature(message)
+        for attempt in range(MAX_RETRY_ATTEMPTS):
+            try:
+                await self.logger_msg(f"Authorization attempt {attempt+1}/{MAX_RETRY_ATTEMPTS}", "info", self.wallet_address)
+                
+                message = f"I accept the Quills Adventure Terms of Service at https://quills.fun/terms\n\nNonce: {int(time.time() * 1000)}"
+                signature = await self.get_signature(message)
+                
+                json_data = {
+                    'address': self.wallet_address,
+                    'signature': f"0x{signature}",
+                    'message': message,
+                }
+                
+                response = await self._api.send_request(
+                    request_type="POST",
+                    method="/auth/wallet",
+                    json_data=json_data,
+                    headers=_get_headers(),
+                    verify=False
+                )
+                
+                if response is None:
+                    error_msg = f"Empty auth response (attempt {attempt+1})"
+                    await self.logger_msg(error_msg, "error", self.wallet_address, "auth")
+                    error_messages.append(error_msg)
+                    if attempt < MAX_RETRY_ATTEMPTS-1:
+                        await random_sleep(self.wallet_address, *RETRY_SLEEP_RANGE)
+                    continue
+                    
+                status, result = await self._process_api_response(response, "logged into the site quills.fun")
+                if status:
+                    return status, result
+                    
+                error_messages.append(result)
+                if attempt < MAX_RETRY_ATTEMPTS-1:
+                    await random_sleep(self.wallet_address, *RETRY_SLEEP_RANGE)
+                    
+            except Exception as e:
+                error_msg = f"Auth attempt {attempt+1} failed: {str(e)}"
+                await self.logger_msg(error_msg, "error", self.wallet_address, "auth")
+                error_messages.append(error_msg)
+                if attempt < MAX_RETRY_ATTEMPTS-1:
+                    await random_sleep(self.wallet_address, *RETRY_SLEEP_RANGE)
         
-        json_data = {
-            'address': self.wallet_address,
-            'signature': f"0x{signature}",
-            'message': message,
-        }
-        
-        response = await self._api.send_request(
-            request_type="POST",
-            method="/auth/wallet",
-            json_data=json_data,
-            headers=_get_headers(),
-            verify=False
-        )
-        
-        return await self._process_api_response(response, "logged into the site quills.fun")
+        return False, f"Authorization failed after {MAX_RETRY_ATTEMPTS} attempts. Errors:\n" + "\n".join(error_messages)
 
     async def mint_message_nft(self) -> tuple[bool, str]:
-        await self.logger_msg(
-            msg=f"Beginning the process of sending a message...", 
-            type_msg="info", address=self.wallet_address
-        )
-        
+        await self.logger_msg(f"Starting sending a message...", "info", self.wallet_address)
+        error_messages = []
         message = self.fake.word()
         
         json_data = {
@@ -118,13 +130,9 @@ class QuillsMessageModule(Wallet, AsyncLogger):
             'message': message,
         }
         
-        max_attempts = 3
-        for attempt in range(1, max_attempts + 1):
+        for attempt in range(MAX_RETRY_ATTEMPTS):
             try:
-                await self.logger_msg(
-                    msg=f"Attempt to mint a message {attempt}/{max_attempts}", 
-                    type_msg="info", address=self.wallet_address
-                )
+                await self.logger_msg(f"Attempt to mint a message {attempt+1}/{MAX_RETRY_ATTEMPTS}", "info", self.wallet_address)
                 
                 response = await self._api.send_request(
                     request_type="POST",
@@ -135,49 +143,41 @@ class QuillsMessageModule(Wallet, AsyncLogger):
                 )
                 
                 if response is None:
-                    await self.logger_msg(
-                        msg=f"Received an empty response from the API (attempt {attempt})", 
-                        type_msg="error", address=self.wallet_address, method_name="mint_message_nft"
-                    )
-                    if attempt < max_attempts:
-                        await random_sleep(self.wallet_address)
+                    error_msg = f"Received empty API response (attempt {attempt+1})"
+                    await self.logger_msg(error_msg, "error", self.wallet_address, "mint_message_nft")
+                    error_messages.append(error_msg)
+                    if attempt < MAX_RETRY_ATTEMPTS-1:
+                        await random_sleep(self.wallet_address, *RETRY_SLEEP_RANGE)
                     continue
                     
                 status, result = await self._process_api_response(response, f"minted an nft message: {message}")
                 if status:
                     return status, result
+                
+                error_messages.append(result)
+                if attempt < MAX_RETRY_ATTEMPTS-1:
+                    await random_sleep(self.wallet_address, *RETRY_SLEEP_RANGE)
                     
-                if attempt < max_attempts:
-                    await random_sleep(self.wallet_address)
             except Exception as e:
-                await self.logger_msg(
-                    msg=f"Error during minting a message (attempt {attempt}): {str(e)}", 
-                    type_msg="error", address=self.wallet_address, method_name="mint_message_nft"
-                )
-                if attempt < max_attempts:
-                    time.sleep(2 * attempt)
-        
-        await self.logger_msg(
-            msg=f"All attempts to mint a message have been exhausted", 
-            type_msg="error", address=self.wallet_address, method_name="mint_message_nft"
-        )
-        return False, "Failed to mint an nft message"
+                error_msg = f"Attempt {attempt+1} failed: {str(e)}"
+                await self.logger_msg(error_msg, "error", self.wallet_address, "mint_message_nft")
+                error_messages.append(error_msg)
+                if attempt < MAX_RETRY_ATTEMPTS-1:
+                    await random_sleep(self.wallet_address, *RETRY_SLEEP_RANGE)
+            
+        return False, f"Failed minting message after {MAX_RETRY_ATTEMPTS} attempts. Error details:\n" + "\n".join(error_messages)
     
     async def run(self) -> tuple[bool, str]:
         try:
-            await self.logger_msg(
-                msg=f"I perform tasks on sending and minting nft message on the site quills.fun...", 
-                type_msg="info", address=self.wallet_address
+            await self.logger_msg(f"Performing the task of sending and minting nft messages on quills.fun...", "info", self.wallet_address
             )
             
-            if not await self.auth():
-                return False, "Failed to authorize on the site quills.fun"
+            status, msg = await self.auth()
+            if not status: return status, msg
             
             return await self.mint_message_nft()
         
         except Exception as e:
-            await self.logger_msg(
-                msg=f"Error: {str(e)}", type_msg="error", 
-                address=self.wallet_address, method_name="run"
-            )
-            return False, str(e)
+            error_msg = f"Error: {str(e)}"
+            await self.logger_msg(error_msg, "error", self.wallet_address, "run")
+            return False, error_msg
