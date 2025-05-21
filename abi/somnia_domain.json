@@ -1,0 +1,34 @@
+[
+    {
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "domain",
+                "type": "string"
+            }
+        ],
+        "name": "claimName",
+        "outputs": [],
+        "stateMutability": "payable",
+        "type": "function"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "operator",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "fullDomain",
+                "type": "string"
+            }
+        ],
+        "name": "DomainRegistered",
+        "type": "event"
+    }
+]

@@ -20,3 +20,4 @@ from .mint_nft import (
 from .mint_domen import MintDomenModule
 from .check_native_balance import CheckNativeBalanceModule
 from .daily_gm import GmModule
+from .somnia_domain import SomniaDomainsModule

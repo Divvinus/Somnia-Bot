@@ -153,3 +153,8 @@ class CommunityNFTContract(BaseContract):
 class ZNSContract(BaseContract):
     address: str = AsyncWeb3.to_checksum_address("0xf180136DdC9e4F8c9b5A9FE59e2b1f07265C5D4D")
     abi_file: str = "zns_domen.json"
+    
+@dataclass(slots=True)
+class SomniaDomainsContract(BaseContract):
+    address: str = AsyncWeb3.to_checksum_address("0xDB4e0A5E7b0d03aA41cBB7940c5e9Bab06cc7157")
+    abi_file: str = "somnia_domain.json"

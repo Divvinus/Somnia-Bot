@@ -103,7 +103,7 @@ class ProfileModule(SomniaClient, AsyncLogger):
         }
 
     async def create_username(self) -> tuple[bool, str]:
-        await self.logger_msg("Trying to set the username...", "info", self.wallet_address,)
+        await self.logger_msg("Trying to set the username...", "info", self.wallet_address)
 
         headers = {
             **self._base_headers, "referer": "https://quest.somnia.network/account",
