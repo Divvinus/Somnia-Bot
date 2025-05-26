@@ -61,7 +61,7 @@ class TwitterWorker(Wallet, AsyncLogger):
                     address=self.wallet_address
                 )
                 
-    async def retweet_tweeet(self, tweet_id: int) -> bool:
+    async def retweet_tweet(self, tweet_id: int) -> bool:
         await self.logger_msg(
             msg=f"Trying to retweet the post with ID: {tweet_id}", type_msg="info", 
             address=self.wallet_address
@@ -69,10 +69,6 @@ class TwitterWorker(Wallet, AsyncLogger):
 
         async with self._get_twitter_client() as client:
             if not client:
-                await self.logger_msg(
-                    msg=f"Failed to initialize Twitter client for retweet", type_msg="error", 
-                    address=self.wallet_address, method_name="retweet_tweeet"
-                )
                 return False
 
             for attempt in range(3):
@@ -117,14 +113,14 @@ class TwitterWorker(Wallet, AsyncLogger):
                 except Exception as outer_error:
                     await self.logger_msg(
                         msg=f"Unexpected error: {outer_error}", type_msg="error", 
-                        address=self.wallet_address, method_name="retweet_tweeet"
+                        address=self.wallet_address, method_name="retweet_tweet"
                     )
                     if attempt == 2:
                         return False
 
             await self.logger_msg(
                 msg=f"Failed to retweet a tweet even after three attempts", type_msg="error", 
-                address=self.wallet_address, method_name="retweet_tweeet"
+                address=self.wallet_address, method_name="retweet_tweet"
             )
             return False
         

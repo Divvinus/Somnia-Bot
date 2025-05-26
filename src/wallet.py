@@ -152,6 +152,8 @@ class Wallet(AsyncWeb3, Account):
         raise TypeError("Invalid contract type: expected BaseContract, str, or contract-like object")
 
     async def token_balance(self, token_address: str) -> int:
+        if self._is_native_token(token_address):
+            return await self.eth.get_balance(self.private_key.address)
         contract = await self.get_contract(token_address)
         return await contract.functions.balanceOf(
             self._get_checksum_address(self.private_key.address)
@@ -165,6 +167,13 @@ class Wallet(AsyncWeb3, Account):
         if checksum_address not in self._contracts_cache:
             self._contracts_cache[checksum_address] = await self.get_contract(checksum_address)
         return self._contracts_cache[checksum_address]
+    
+    async def get_decimals(self, token_address: str) -> int:
+        checksum_address = self._get_checksum_address(token_address)
+        if self._is_native_token(checksum_address):
+            return 18
+        contract = await self._get_cached_contract(checksum_address)
+        return await contract.functions.decimals().call()
 
     async def convert_amount_to_decimals(self, amount: Decimal, token_address: str) -> int:
         checksum_address = self._get_checksum_address(token_address)

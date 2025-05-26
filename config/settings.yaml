@@ -13,8 +13,8 @@ threads: 1
 #------------------------------------------------------------------------------
 # en: Initial delay range before starting operations (seconds) | ru: Диапазон начальной задержки перед началом выполнения (секунды)
 delay_before_start:
-    min: 10
-    max: 15
+    min: 1
+    max: 30
 
 # en: Delay between tasks (seconds) | ru: Задержка между задачами (секунды)
 delay_between_tasks:
@@ -75,33 +75,7 @@ available_modules:
   - "nerzo_nft"         # Nerzo NFT
   - "somni_nft"         # Минт Somni NFT
   - "daily_gm"          # Ежедневный GM
-  - "quest_yapper"      # Somnia Yappers
   - "community_nft"     # Community NFT
   - "somnia_domain"     # Somnia Domain
-
-#------------------------------------------------------------------------------
-# en: TOKEN CONFIGURATION | ru: КОНФИГУРАЦИЯ ТОКЕНОВ
-#------------------------------------------------------------------------------
-# en: Define tokens and their percentage ranges to be used in operations 
-# ru: Определение токенов и их процентных диапазонов для использования в операциях
-tokens:
-  # en: Token name/symbol | ru: Название/символ токена
-  STT:
-    # en: Percentage range of token amount to use | ru: Диапазон процентов от суммы токенов для использования
-    percent_range:
-      min: 5  # 5%
-      max: 10 # 10%
-    # en: Contract address | ru: Адрес контракта
-    contract_address: "0x0000000000000000000000000000000000000000"
-  WSTT:
-    percent_range:
-      min: 5
-      max: 10
-    # en: Contract address (ERC20) | ru: Адрес контракта (ERC20)
-    contract_address: "0x4A3BC48C156384f9564Fd65A53a2f3D534D8f2b7"
-  USDT:
-    percent_range:
-      min: 30
-      max: 50
-    # en: Contract address (ERC20) | ru: Адрес контракта (ERC20)
-    contract_address: "0xE9CC37904875B459Fa5D0FE37680d36F1ED55e38"
+  - "quest_gamers"      # Gamers L.A.B
+  - "quest_dragon"      # Somniacs, feed the Dragon!

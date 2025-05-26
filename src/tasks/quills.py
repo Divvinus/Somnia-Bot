@@ -142,6 +142,11 @@ class QuillsMessageModule(Wallet, AsyncLogger):
                     verify=False
                 )
                 
+                if response.get("status_code") == 500:
+                    error_msg = "Quills server is not working, please try again later"
+                    await self.logger_msg(error_msg, "error", self.wallet_address, "mint_message_nft")
+                    return False, error_msg
+                
                 if response is None:
                     error_msg = f"Received empty API response (attempt {attempt+1})"
                     await self.logger_msg(error_msg, "error", self.wallet_address, "mint_message_nft")

@@ -101,6 +101,16 @@ class SomniaBot:
         
     # === Onchain operations ===
     @staticmethod
+    async def process_swap(account: Account) -> tuple[bool, str]:
+        async with QuickSwapModule(account) as swap:
+            return await swap.run_quick_swap()
+        
+    @staticmethod
+    async def process_pool(account: Account) -> tuple[bool, str]:
+        async with QuickSwapModule(account) as pool:
+            return await pool.run_quick_pool()
+
+    @staticmethod
     async def process_onchain_gm(account: Account) -> tuple[bool, str]:
         async with OnchainGMModule(account) as module:
             return await module.run()
@@ -132,6 +142,11 @@ class SomniaBot:
 
     # === Quests ===
     @staticmethod
-    async def process_quest_yapper(account: Account) -> tuple[bool, str]:
-        async with QuestYappersModule(account) as module:
+    async def process_quest_gamers(account: Account) -> tuple[bool, str]:
+        async with QuestGamersModule(account) as module:
+            return await module.run()
+        
+    @staticmethod
+    async def process_quest_dragon(account: Account) -> tuple[bool, str]:
+        async with QuestDragonModule(account) as module:
             return await module.run()

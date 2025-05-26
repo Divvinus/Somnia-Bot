@@ -75,7 +75,6 @@ class MintDomenModule(Wallet, AsyncLogger):
             result, tx_hash = await self._process_transaction(tx_params)
             if not result:
                 error_msg = f"Transaction failed: {tx_hash}"
-                await self.logger_msg(error_msg, "error", self.wallet_address)
                 return False, tx_hash
 
             return True, tx_hash

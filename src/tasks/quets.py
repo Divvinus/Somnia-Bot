@@ -4,11 +4,8 @@ from typing import Any, Self
 
 from config.settings import sleep_between_tasks
 from src.api import SomniaClient
-from src.tasks import (
-    ProfileModule, 
-    TransferSTTModule
-)
-from bot_loader import config
+from .profile import ProfileModule
+from .quickswap import QuickSwapModule
 from src.logger import AsyncLogger
 from src.models import Account
 from src.utils import random_sleep, TwitterWorker
@@ -18,14 +15,14 @@ from src.utils import random_sleep, TwitterWorker
 class QuestConfig:
     campaign_id: int
     quest_handlers: dict[int, str]
-
-
-async def process_transfer_stt(
-    account: Account,
-    me: bool = False,
-) -> tuple[bool, str]:
-    async with TransferSTTModule(account, config.somnia_rpc, me) as module:
-        return await module.transfer_stt()
+    
+async def process_swap(account: Account) -> tuple[bool, str]:
+    async with QuickSwapModule(account) as swap:
+        return await swap.run_quick_swap(pair_swap={1: ["STT", "USDC", 25]})
+    
+async def process_pool(account: Account) -> tuple[bool, str]:
+    async with QuickSwapModule(account) as pool:
+        return await pool.run_quick_pool(lower_token_persentage=10, range_ticks=5)
 
 
 class BaseQuestModule(SomniaClient, ABC):
@@ -154,45 +151,10 @@ class BaseQuestModule(SomniaClient, ABC):
         )
         return await self._process_response(response, success_msg, error_msg)
 
-    async def check_prerequisites(self) -> tuple[bool, str]:
-        required_tokens = []
-        
-        if any(handler.startswith("handle_twitter") for handler in self.quest_config.quest_handlers.values()):
-            required_tokens.append(("Twitter tokens", bool(self.account.auth_tokens_twitter)))
-            
-        if any(handler.startswith("handle_discord") or handler.endswith("discord") for handler in self.quest_config.quest_handlers.values()):
-            required_tokens.append(("Discord tokens", bool(self.account.auth_tokens_discord)))
-            
-        if any(handler.startswith("handle_telegram") for handler in self.quest_config.quest_handlers.values()):
-            required_tokens.append(("Telegram session", bool(self.account.telegram_session)))
-        
-        missing_tokens = [name for name, exists in required_tokens if not exists]
-        
-        if missing_tokens:
-            missing_str = ", ".join(missing_tokens)
-            return False, f"Missing: {missing_str}"
-        
-        return True, "All prerequisites met"
-
     async def run(self) -> tuple[bool, str]:
         try:
             class_name = self.__class__.__name__
             quest_name = class_name.replace("Module", "").replace("Quest", "")
-            
-            prereq_met, prereq_msg = await self.check_prerequisites()
-            if not prereq_met:
-                await self.logger.logger_msg(
-                    msg=f'Quest: "{quest_name}" cannot proceed - {prereq_msg}', 
-                    type_msg="error", address=self.wallet_address, class_name=class_name, method_name="run"
-                )
-                return False, f"Cannot proceed: {prereq_msg}"
-            
-            if not self.quest_config or not hasattr(self.quest_config, 'quest_handlers') or not self.quest_config.quest_handlers:
-                await self.logger.logger_msg(
-                    msg=f'Quest: "Somnia Testnet Odyssey - {quest_name}" | No quest handlers defined', 
-                    type_msg="error", address=self.wallet_address, class_name=class_name, method_name="run"
-                )
-                return False, "No quest handlers defined"
             
             await self.logger.logger_msg(
                 msg=f'Starting quest: "Somnia Testnet Odyssey - {quest_name}" processing...', 
@@ -312,15 +274,21 @@ class BaseQuestModule(SomniaClient, ABC):
         async def wrapper(self, *args, **kwargs):
             handler_name = handler_func.__name__
             
-            if "twitter" in handler_name and not self.account.auth_tokens_twitter:
-                return False, "No Twitter auth tokens"
-                
-            if "discord" in handler_name and not self.account.auth_tokens_discord:
-                return False, "No Discord auth tokens"
-                
-            if "telegram" in handler_name and not self.account.telegram_session:
-                return False, "No Telegram session"
+            token_checks = {
+                "twitter": ("Twitter auth tokens", self.account.auth_tokens_twitter),
+                "discord": ("Discord tokens", self.account.auth_tokens_discord),
+                "telegram": ("Telegram session", self.account.telegram_session)
+            }
+
+            missing = []
+            for key, (name, token) in token_checks.items():
+                if key in handler_name and not token:
+                    missing.append(name)
             
+            if missing:
+                msg = f"Missing required: {', '.join(missing)}"
+                return False, msg
+                
             try:
                 handler_type = handler_name.replace("handle_", "")
                 quest_desc = f"{handler_type.replace('_', ' ').title()}"
@@ -343,73 +311,130 @@ class BaseQuestModule(SomniaClient, ABC):
                 )
                 return False, error_msg
         return wrapper
+
     
-    
-class QuestYappersModule(BaseQuestModule):
-    user_id = {
-        "yapper": 1920644407344193536
+class QuestGamersModule(BaseQuestModule):
+    CAMPAIGN_ID = 33
+    QUEST_HANDLERS = {
+        146: "handle_twitter_follow_gamers",
+        147: "handle_retweet_and_like"
     }
-    
+    TARGET_IDS = {
+        "gamers_user": 1912930888977137664,
+        "campaign_tweet": 1925219946004463983 
+    }
+
     def __init__(self, account: Account) -> None:
         super().__init__(
             account,
             QuestConfig(
-                campaign_id=26,
-                quest_handlers={
-                    142: "handle_twitter_follow_yapper",
-                    143: "handle_retweet_and_like"
-                }
+                campaign_id=self.CAMPAIGN_ID,
+                quest_handlers=self.QUEST_HANDLERS
             )
         )
-        
-    async def handle_twitter_follow_yapper(self) -> tuple[bool, str | None]:
-        if not self.account.auth_tokens_twitter:
-            return False, "No Twitter auth tokens"
-        
-        await self.logger.logger_msg(
-            msg=f'Processing "Follow Yappers"', type_msg="info", address=self.wallet_address
-        )
-        
-        async with TwitterWorker(self.account) as twitter_module:
-            result_follow = await twitter_module.follow_user(self.user_id["yapper"])
-            if not result_follow:
-                return False, "Failed to follow"
-            
-        await random_sleep(self.wallet_address, **sleep_between_tasks)
-        
+
+    async def _execute_twitter_verification(self, quest_id: int, endpoint: str, success_msg: str, error_msg: str) -> tuple[bool, str]:
         return await self._send_verification_request(
-            quest_id=142,
-            endpoint="/social/twitter/follow",
-            success_msg="Successfully verified Twitter follow",
-            error_msg="Failed to verify Twitter follow",
+            quest_id=quest_id,
+            endpoint=endpoint,
+            success_msg=success_msg,
+            error_msg=error_msg
         )
-    
-    async def handle_retweet_and_like(self) -> tuple[bool, str | None]:
-        if not self.account.auth_tokens_twitter:
-            return False, "No Twitter auth tokens"
-        
-        await self.logger.logger_msg(
-            msg=f'Processing "Retweet and like"', type_msg="info", address=self.wallet_address
-        )
-        
-        tweet_id = 1917609993135628534
-        
+
+    @BaseQuestModule.safe_quest_handler
+    async def handle_twitter_follow_gamers(self) -> tuple[bool, str]:
         async with TwitterWorker(self.account) as twitter_module:
-            result_retweet = await twitter_module.retweet_tweeet(tweet_id)
-            if not result_retweet:
-                return False, "Failed to retweet"
+            if not await twitter_module.follow_user(self.TARGET_IDS["gamers_user"]):
+                return False, "Follow failed"
+        
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        return await self._execute_twitter_verification(
+            quest_id=146,
+            endpoint="/social/twitter/follow",
+            success_msg="Twitter follow verified",
+            error_msg="Twitter follow verification failed"
+        )
+
+    @BaseQuestModule.safe_quest_handler
+    async def handle_retweet_and_like(self) -> tuple[bool, str]:
+        async with TwitterWorker(self.account) as twitter_module:
+            if not await twitter_module.retweet_tweet(self.TARGET_IDS["campaign_tweet"]):
+                return False, "Retweet failed"
             
             await random_sleep(self.wallet_address, **sleep_between_tasks)
             
-            result_like = await twitter_module.like_tweet(tweet_id)
-            if not result_like:
-                return False, "Failed to like"
+            if not await twitter_module.like_tweet(self.TARGET_IDS["campaign_tweet"]):
+                return False, "Like failed"
+        
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        return await self._execute_twitter_verification(
+            quest_id=147,
+            endpoint="/social/twitter/retweet",
+            success_msg="Twitter retweet verified",
+            error_msg="Twitter retweet verification failed"
+        )
+        
+        
+class QuestDragonModule(BaseQuestModule):
+    CAMPAIGN_ID = 34
+    QUEST_HANDLERS = {
+        150: "handle_twitter_follow",
+        148: "handle_add_liquidity",
+        149: "handle_swap"
+    }
+    TARGET_IDS = {
+        "quickswap_user": 1311611340767793154
+    }
+    ENDPOINTS = {
+        "follow": "/social/twitter/follow",
+        "onchain": "/onchain/subgraph"
+    }
+
+    def __init__(self, account: Account) -> None:
+        super().__init__(
+            account,
+            QuestConfig(
+                campaign_id=self.CAMPAIGN_ID,
+                quest_handlers=self.QUEST_HANDLERS
+            )
+        )
+
+    async def _execute_onchain_verification(self, quest_id: int, operation: str) -> tuple[bool, str]:
+        return await self._send_verification_request(
+            quest_id=quest_id,
+            endpoint=self.ENDPOINTS["onchain"],
+            success_msg=f"Successfully {operation}",
+            error_msg=f"Failed {operation}"
+        )
+
+    @BaseQuestModule.safe_quest_handler
+    async def handle_twitter_follow(self) -> tuple[bool, str]:
+        async with TwitterWorker(self.account) as twitter_module:
+            if not await twitter_module.follow_user(self.TARGET_IDS["quickswap_user"]):
+                return False, "Follow action failed"
+        
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        return await self._send_verification_request(
+            quest_id=150,
+            endpoint=self.ENDPOINTS["follow"],
+            success_msg="Twitter follow verified",
+            error_msg="Twitter follow verification failed"
+        )
+    
+    @BaseQuestModule.safe_quest_handler
+    async def handle_swap(self) -> tuple[bool, str]:
+        success, _ = await process_swap(self.account)
+        if not success:
+            return False, "Swap operation failed"
             
         await random_sleep(self.wallet_address, **sleep_between_tasks)
-        
-        return await self._send_verification_request(
-            quest_id=143,
-            endpoint="/social/twitter/retweet",
-            success_msg="Successfully verified Twitter retweet",
-            error_msg="Failed to verify Twitter retweet",
-        )
+        return await self._execute_onchain_verification(149, "Quick Swap")
+
+    @BaseQuestModule.safe_quest_handler
+    async def handle_add_liquidity(self) -> tuple[bool, str]:
+        success, _ = await process_pool(self.account)
+        if not success:
+            return False, "Liquidity add failed"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        return await self._execute_onchain_verification(148, "Quick Add Liquidity")

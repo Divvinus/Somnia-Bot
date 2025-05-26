@@ -1,0 +1,58 @@
+[
+  {
+    "type": "function",
+    "name": "safelyGetStateOfAMM",
+    "inputs": [],
+    "outputs": [
+      {
+        "internalType": "uint160",
+        "name": "sqrtPrice",
+        "type": "uint160"
+      },
+      {
+        "internalType": "int24",
+        "name": "tick",
+        "type": "int24"
+      },
+      {
+        "internalType": "uint16",
+        "name": "lastFee",
+        "type": "uint16"
+      },
+      {
+        "internalType": "uint8",
+        "name": "pluginConfig",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint128",
+        "name": "activeLiquidity",
+        "type": "uint128"
+      },
+      {
+        "internalType": "int24",
+        "name": "nextTick",
+        "type": "int24"
+      },
+      {
+        "internalType": "int24",
+        "name": "previousTick",
+        "type": "int24"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "tickSpacing",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "int24",
+        "internalType": "int24"
+      }
+    ],
+    "stateMutability": "view"
+  }
+]

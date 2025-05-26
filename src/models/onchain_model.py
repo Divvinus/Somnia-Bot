@@ -158,3 +158,23 @@ class ZNSContract(BaseContract):
 class SomniaDomainsContract(BaseContract):
     address: str = AsyncWeb3.to_checksum_address("0xDB4e0A5E7b0d03aA41cBB7940c5e9Bab06cc7157")
     abi_file: str = "somnia_domain.json"
+    
+@dataclass(slots=True)
+class QuickSwapRouterContract(BaseContract):
+    address: str = AsyncWeb3.to_checksum_address("0xE94de02e52Eaf9F0f6Bf7f16E4927FcBc2c09bC7")
+    abi_file: str = "quick_swap_router.json"
+    
+@dataclass(slots=True)
+class QuickSwapFactoryContract(BaseContract):
+    address: str = AsyncWeb3.to_checksum_address("0x0BFaCE9a5c9F884a4f09fadB83b69e81EA41424B")
+    abi_file: str = "quick_swap_factory.json"
+    
+@dataclass(slots=True)
+class QuickSwapAddressPairContract(BaseContract):
+    address: str 
+    abi_file: str = "quick_swap_address_pair.json"
+    
+@dataclass(slots=True)
+class QuickPoolContract(BaseContract):
+    address: str = AsyncWeb3.to_checksum_address("0x37A4950b4ea0C46596404895c5027B088B0e70e7")
+    abi_file: str = "quick_pool.json"

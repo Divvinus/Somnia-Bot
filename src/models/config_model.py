@@ -70,12 +70,6 @@ class PercentRange(BaseModel):
             raise ValueError('max must be greater than or equal to min')
         return value
 
-
-class TokenConfig(BaseModel):
-    percent_range: PercentRange
-    contract_address: str | None = None
-
-
 class AlwaysRunTasks(BaseModel):
     modules: list[str] = Field(default_factory=list)
 
@@ -93,7 +87,6 @@ class Config(BaseModel):
     send_stats_to_telegram: bool = False
     somnia_rpc: str = ""
     somnia_explorer: str = ""
-    tokens: dict[str, TokenConfig] = Field(default_factory=dict)
     always_run_tasks: AlwaysRunTasks = Field(default_factory=AlwaysRunTasks)
     module: str = ""
     route_name: str = "default"
