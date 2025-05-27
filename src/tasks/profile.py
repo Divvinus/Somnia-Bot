@@ -177,24 +177,31 @@ class ProfileModule(SomniaClient, AsyncLogger):
                     self._me_info_cache = None
                     return True, msg
 
-                if status == 500 and response.get("text", "").find("Internal server error") != -1:
+                if status == 500 and "Internal server error" in response.get("text", ""):
                     error_msg = "Telegram account already bound to another wallet in Somnia"
                     await self.logger_msg(error_msg, "warning", self.wallet_address, "connect_telegram_account")
                     return False, error_msg
 
                 error_text = response.get("text", "")
                 await self.logger_msg(
-                    f"Telegram connection failed: {status}, {error_text}", "error", self.wallet_address, "connect_telegram_account"
+                    f"Telegram connection failed: {status}, {error_text}", 
+                    "error", 
+                    self.wallet_address, 
+                    "connect_telegram_account"
                 )
 
             except Exception as e:
-                error_msg = f"Error connecting Telegram: {error_msg}"
-                await self.logger_msg(error_msg, "error", self.wallet_address, "connect_telegram_account"
+                error_msg = f"Error connecting Telegram: {e}"
+                await self.logger_msg(
+                    error_msg, 
+                    "error", 
+                    self.wallet_address, 
+                    "connect_telegram_account"
                 )
                 if attempt == MAX_RETRY_ATTEMPTS - 1:
                     return False, error_msg
                 await random_sleep(self.wallet_address, *RETRY_SLEEP_RANGE)
-            
+        
         return False, f"Failed connecting Telegram after {MAX_RETRY_ATTEMPTS} attempts"
 
     async def connect_discord_account(self) -> tuple[bool, str]:

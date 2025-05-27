@@ -146,7 +146,10 @@ class BaseQuestModule(SomniaClient, ABC):
         response = await self.send_request(
             request_type="POST",
             method=endpoint,
-            headers=self._build_headers(auth=True),
+            headers = self._build_headers(
+                auth=True,
+                referer=f"{self._config.BASE_URL}/campaigns/{self.quest_config.campaign_id}"
+            ),
             json_data=json_data,
         )
         return await self._process_response(response, success_msg, error_msg)
@@ -423,18 +426,12 @@ class QuestDragonModule(BaseQuestModule):
     
     @BaseQuestModule.safe_quest_handler
     async def handle_swap(self) -> tuple[bool, str]:
-        success, _ = await process_swap(self.account)
-        if not success:
-            return False, "Swap operation failed"
-            
+        success, _ = await process_swap(self.account)            
         await random_sleep(self.wallet_address, **sleep_between_tasks)
         return await self._execute_onchain_verification(149, "Quick Swap")
 
     @BaseQuestModule.safe_quest_handler
     async def handle_add_liquidity(self) -> tuple[bool, str]:
-        success, _ = await process_pool(self.account)
-        if not success:
-            return False, "Liquidity add failed"
-            
+        success, _ = await process_pool(self.account)            
         await random_sleep(self.wallet_address, **sleep_between_tasks)
         return await self._execute_onchain_verification(148, "Quick Add Liquidity")
