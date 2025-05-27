@@ -18,6 +18,7 @@ sys.path.append(os.path.realpath("."))
 
 class Console:
     MODULES = (
+        "🤷‍♂️ Profile",
         "🏆 Account statistics",
         "🔑 Get referral code",
         "💰 Faucet (Account validity check)",
@@ -34,6 +35,7 @@ class Console:
     )
     
     MODULES_DATA = {
+        "🤷‍♂️ Profile": "profile",
         "🏆 Account statistics": "account_statistics",
         "🔑 Get referral code": "get_referral_code",
         "💰 Faucet (Account validity check)": "faucet",

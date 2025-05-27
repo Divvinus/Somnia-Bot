@@ -11,8 +11,8 @@ from src.utils import (
     generate_username,
     random_sleep,
     clear_reconnect_flag_after_success,
-    COL_RECONNECT_DISCORD,
-    COL_RECONNECT_TWITTER
+    COL_DISCORD_TOKEN,
+    COL_TWITTER_TOKEN
 )
 from config.settings import (
     MAX_RETRY_ATTEMPTS,
@@ -245,7 +245,7 @@ class ProfileModule(SomniaClient, AsyncLogger):
                     if self.account.auth_tokens_discord:
                         await clear_reconnect_flag_after_success(
                             token=self.account.auth_tokens_discord,
-                            token_column_name=COL_RECONNECT_DISCORD,
+                            token_column_name=COL_DISCORD_TOKEN,
                             wallet_address=self.wallet_address
                         )
                         
@@ -310,7 +310,7 @@ class ProfileModule(SomniaClient, AsyncLogger):
                     if self.account.auth_tokens_twitter:
                         await clear_reconnect_flag_after_success(
                             token=self.account.auth_tokens_twitter,
-                            token_column_name=COL_RECONNECT_TWITTER,
+                            token_column_name=COL_TWITTER_TOKEN,
                             wallet_address=self.wallet_address
                         )
                         
