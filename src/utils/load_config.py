@@ -122,9 +122,9 @@ class ConfigLoader:
                 else None
             )
             reconnect_twitter = (
-                row[col_map.get('Reconnect Twitter')] 
-                if 'Reconnect Twitter' in col_map 
-                else None
+                int(row[col_map['Reconnect Twitter']]) 
+                if 'Reconnect Twitter' in col_map and row[col_map['Reconnect Twitter']] is not None 
+                else 0
             )
             discord_token = (
                 row[col_map.get('Discord Token')] 
@@ -132,9 +132,9 @@ class ConfigLoader:
                 else None
             )
             reconnect_discord = (
-                row[col_map.get('Reconnect Discord')] 
-                if 'Reconnect Discord' in col_map 
-                else None
+                int(row[col_map['Reconnect Discord']]) 
+                if 'Reconnect Discord' in col_map and row[col_map['Reconnect Discord']] is not None 
+                else 0
             )
             
             proxy = None

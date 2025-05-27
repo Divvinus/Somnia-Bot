@@ -30,8 +30,8 @@ class Account:
         auth_tokens_twitter: str | None = None,
         auth_tokens_discord: str | None = None,
         telegram_session: Path | None = None,
-        reconnect_twitter: bool | None = None,
-        reconnect_discord: bool | None = None,
+        reconnect_twitter: int = 0,
+        reconnect_discord: int = 0
     ) -> None:
         self.private_key = private_key
         self.proxy = proxy

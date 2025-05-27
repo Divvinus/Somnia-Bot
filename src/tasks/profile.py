@@ -10,7 +10,7 @@ from src.models import Account
 from src.utils import (
     generate_username,
     random_sleep,
-    clear_token_after_successful_connection,
+    clear_reconnect_flag_after_success,
     COL_RECONNECT_DISCORD,
     COL_RECONNECT_TWITTER
 )
@@ -236,7 +236,7 @@ class ProfileModule(SomniaClient, AsyncLogger):
                     self._me_info_cache = None
                     
                     if self.account.auth_tokens_discord:
-                        await clear_token_after_successful_connection(
+                        await clear_reconnect_flag_after_success(
                             token=self.account.auth_tokens_discord,
                             token_column_name=COL_RECONNECT_DISCORD,
                             wallet_address=self.wallet_address
@@ -301,7 +301,7 @@ class ProfileModule(SomniaClient, AsyncLogger):
                     self._me_info_cache = None
                     
                     if self.account.auth_tokens_twitter:
-                        await clear_token_after_successful_connection(
+                        await clear_reconnect_flag_after_success(
                             token=self.account.auth_tokens_twitter,
                             token_column_name=COL_RECONNECT_TWITTER,
                             wallet_address=self.wallet_address
@@ -439,24 +439,36 @@ class ProfileModule(SomniaClient, AsyncLogger):
                     )
 
             # Discord
-            if (self.account.auth_tokens_discord
-                    and ("discordName" in null_fields or self.account.reconnect_discord)):
+            if (
+                self.account.auth_tokens_discord
+                and (
+                    "discordName" in null_fields 
+                    or self.account.reconnect_discord == 1
+                )
+            ):
                 ok, msg = await self.connect_discord_account()
                 if not ok:
                     errors.append(msg)
                 else:
+                    self.account.reconnect_discord = 0
                     await random_sleep(
                         self.wallet_address,
                         **sleep_after_discord_connection,
                     )
 
             # Twitter
-            if (self.account.auth_tokens_twitter
-                    and ("twitterName" in null_fields or self.account.reconnect_twitter)):
+            if (
+                self.account.auth_tokens_twitter
+                and (
+                    "twitterName" in null_fields 
+                    or self.account.reconnect_twitter == 1
+                )
+            ):
                 ok, msg = await self.connect_twitter_account()
                 if not ok:
                     errors.append(msg)
                 else:
+                    self.account.reconnect_twitter = 0
                     await random_sleep(
                         self.wallet_address,
                         **sleep_after_twitter_connection,
