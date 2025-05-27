@@ -55,7 +55,7 @@ class FaucetModule(Wallet):
     async def _handle_response(self, response: FaucetResponse) -> tuple[bool, str]:
         if response.get("status_code") == 403:
             await self.logger.logger_msg(
-                "First register account with Somnia project","warning", 
+                "First register account with Somnia project", "warning", 
                 self.wallet_address, "_handle_response"
             )
             await random_sleep(
@@ -84,19 +84,11 @@ class FaucetModule(Wallet):
             await self.logger.logger_msg(
                 "Faucet request error. Retrying...", "warning", self.wallet_address
             )
-            await random_sleep(
-                self.wallet_address,
-                **sleep_between_repeated_token_requests
-            )
             return False, "Faucet request error. Retrying..."
 
         if error_message:
             await self.logger.logger_msg(
                 f"Unexpected error: {error_message}", "error", self.wallet_address
-            )
-            await random_sleep(
-                self.wallet_address,
-                **sleep_between_repeated_token_requests
             )
             return False, "Unexpected error"
 
@@ -104,7 +96,7 @@ class FaucetModule(Wallet):
             "Successfully requested test tokens", "success", self.wallet_address
         )
         return True, "Successfully requested test tokens"
-    
+        
     async def run(self) -> tuple[bool, str]:
         await self.logger.logger_msg("Processing faucet...", "info", self.wallet_address)
 
@@ -130,13 +122,27 @@ class FaucetModule(Wallet):
                     asyncio.create_task(save_bad_private_key(self.account.private_key, self.wallet_address))
                     return False, "Address suspected to be a bot"
 
-                return await self._handle_response(response)
-                    
+                status, msg = await self._handle_response(response)
+                if status:
+                    return status, msg
+                else:
+                    if attempt < MAX_RETRY_ATTEMPTS - 1:
+                        await self.logger.logger_msg(
+                            f"Retrying ({attempt + 1}/{MAX_RETRY_ATTEMPTS})...", 
+                            "warning", self.wallet_address
+                        )
+                        await random_sleep(
+                            self.wallet_address,
+                            *RETRY_SLEEP_RANGE
+                        )
+                    else:
+                        return False, msg
+
             except Exception as e:
                 error_msg = f"Error processing faucet: {str(e)}"
                 await self.logger.logger_msg(error_msg, "error", self.wallet_address)
                 if attempt == MAX_RETRY_ATTEMPTS - 1:
                     return False, error_msg
                 await random_sleep(self.wallet_address, *RETRY_SLEEP_RANGE)
-            
+        
         return False, f"Failed processing faucet after {MAX_RETRY_ATTEMPTS} attempts"

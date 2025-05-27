@@ -381,15 +381,10 @@ class QuestGamersModule(BaseQuestModule):
 class QuestDragonModule(BaseQuestModule):
     CAMPAIGN_ID = 34
     QUEST_HANDLERS = {
-        150: "handle_twitter_follow",
         148: "handle_add_liquidity",
         149: "handle_swap"
     }
-    TARGET_IDS = {
-        "quickswap_user": 1311611340767793154
-    }
     ENDPOINTS = {
-        "follow": "/social/twitter/follow",
         "onchain": "/onchain/subgraph"
     }
 
@@ -408,20 +403,6 @@ class QuestDragonModule(BaseQuestModule):
             endpoint=self.ENDPOINTS["onchain"],
             success_msg=f"Successfully {operation}",
             error_msg=f"Failed {operation}"
-        )
-
-    @BaseQuestModule.safe_quest_handler
-    async def handle_twitter_follow(self) -> tuple[bool, str]:
-        async with TwitterWorker(self.account) as twitter_module:
-            if not await twitter_module.follow_user(self.TARGET_IDS["quickswap_user"]):
-                return False, "Follow action failed"
-        
-        await random_sleep(self.wallet_address, **sleep_between_tasks)
-        return await self._send_verification_request(
-            quest_id=150,
-            endpoint=self.ENDPOINTS["follow"],
-            success_msg="Twitter follow verified",
-            error_msg="Twitter follow verification failed"
         )
     
     @BaseQuestModule.safe_quest_handler
