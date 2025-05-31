@@ -140,13 +140,18 @@ class SomniaBot:
         async with MintairDeployContractModule(account) as module:
             return await module.run()
 
-    # === Quests ===
+    # === Quests ===        
     @staticmethod
-    async def process_quest_gamers(account: Account) -> tuple[bool, str]:
-        async with QuestGamersModule(account) as module:
+    async def process_quest_somnia_horror(account: Account) -> tuple[bool, str]:
+        async with QuestSomniaHorrorModule(account) as module:
             return await module.run()
         
     @staticmethod
-    async def process_quest_dragon(account: Account) -> tuple[bool, str]:
-        async with QuestDragonModule(account) as module:
+    async def process_quest_ruby_score(account: Account) -> tuple[bool, str]:
+        async with QuestRubyScoreModule(account) as module:
+            return await module.run()
+        
+    @staticmethod
+    async def process_one_billion_quest(account: Account) -> tuple[bool, str]:
+        async with Quest1BILLIONQUESTModule(account) as module:
             return await module.run()

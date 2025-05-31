@@ -6,7 +6,7 @@
 
 
 # en: Account shuffle flag | ru: Флаг перетасовки аккаунтов
-shuffle_flag = True
+shuffle_flag = False
 MAX_RETRY_ATTEMPTS = 5                                              # Количество повторных попыток для неудачных запросов
 RETRY_SLEEP_RANGE = (3, 9)                                          # (min, max) в секундах
 

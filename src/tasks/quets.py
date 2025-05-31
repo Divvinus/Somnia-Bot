@@ -314,17 +314,13 @@ class BaseQuestModule(SomniaClient, ABC):
                 )
                 return False, error_msg
         return wrapper
-
-    
-class QuestGamersModule(BaseQuestModule):
-    CAMPAIGN_ID = 33
+            
+        
+class QuestSomniaHorrorModule(BaseQuestModule):
+    CAMPAIGN_ID = 40
     QUEST_HANDLERS = {
-        146: "handle_twitter_follow_gamers",
-        147: "handle_retweet_and_like"
-    }
-    TARGET_IDS = {
-        "gamers_user": 1912930888977137664,
-        "campaign_tweet": 1925219946004463983 
+        176: "handle_nft",
+        177: "handle_retweet_and_like"
     }
 
     def __init__(self, account: Account) -> None:
@@ -335,57 +331,77 @@ class QuestGamersModule(BaseQuestModule):
                 quest_handlers=self.QUEST_HANDLERS
             )
         )
-
-    async def _execute_twitter_verification(self, quest_id: int, endpoint: str, success_msg: str, error_msg: str) -> tuple[bool, str]:
+    
+    async def handle_nft(self) -> tuple[bool, str]:
         return await self._send_verification_request(
-            quest_id=quest_id,
-            endpoint=endpoint,
-            success_msg=success_msg,
-            error_msg=error_msg
+            quest_id=176,
+            endpoint="/onchain/nft-ownership",
+            success_msg="Create a unique NFT image of your childhood fear through NFTs2Me verified",
+            error_msg=f"Failed verified create a unique NFT image of your childhood fear through NFTs2Me"
         )
-
-    @BaseQuestModule.safe_quest_handler
-    async def handle_twitter_follow_gamers(self) -> tuple[bool, str]:
-        async with TwitterWorker(self.account) as twitter_module:
-            if not await twitter_module.follow_user(self.TARGET_IDS["gamers_user"]):
-                return False, "Follow failed"
         
-        await random_sleep(self.wallet_address, **sleep_between_tasks)
-        return await self._execute_twitter_verification(
-            quest_id=146,
-            endpoint="/social/twitter/follow",
-            success_msg="Twitter follow verified",
-            error_msg="Twitter follow verification failed"
-        )
-
     @BaseQuestModule.safe_quest_handler
     async def handle_retweet_and_like(self) -> tuple[bool, str]:
         async with TwitterWorker(self.account) as twitter_module:
-            if not await twitter_module.retweet_tweet(self.TARGET_IDS["campaign_tweet"]):
+            if not await twitter_module.retweet_tweet(1928468714292470152):
                 return False, "Retweet failed"
             
             await random_sleep(self.wallet_address, **sleep_between_tasks)
             
-            if not await twitter_module.like_tweet(self.TARGET_IDS["campaign_tweet"]):
+            if not await twitter_module.like_tweet(1928468714292470152):
                 return False, "Like failed"
         
         await random_sleep(self.wallet_address, **sleep_between_tasks)
-        return await self._execute_twitter_verification(
-            quest_id=147,
+        return await self._send_verification_request(
+            quest_id=177,
             endpoint="/social/twitter/retweet",
-            success_msg="Twitter retweet verified",
-            error_msg="Twitter retweet verification failed"
+            success_msg="Twitter retweet and like verified",
+            error_msg="Twitter retweet and like verification failed"
+        )
+        
+class QuestRubyScoreModule(BaseQuestModule):
+    CAMPAIGN_ID = 41
+    QUEST_HANDLERS = {
+        161: "handle_follow_twitter"
+    }
+
+    def __init__(self, account: Account) -> None:
+        super().__init__(
+            account,
+            QuestConfig(
+                campaign_id=self.CAMPAIGN_ID,
+                quest_handlers=self.QUEST_HANDLERS
+            )
+        )
+    
+    @BaseQuestModule.safe_quest_handler
+    async def handle_follow_twitter(self) -> tuple[bool, str]:
+        async with TwitterWorker(self.account) as twitter_module:
+            result_follow = await twitter_module.follow_user(1351922850798698502)
+            if not result_follow:
+                return False, "Failed to follow"
+            
+        await random_sleep(self.wallet_address, **sleep_between_tasks)
+        
+        return await self._send_verification_request(
+            quest_id=161,
+            endpoint="/social/twitter/follow",
+            success_msg="Follow RubyScore on X verified",
+            error_msg=f"Failed verified Follow RubyScore on X"
         )
         
         
-class QuestDragonModule(BaseQuestModule):
-    CAMPAIGN_ID = 34
+class Quest1BILLIONQUESTModule(BaseQuestModule):
+    CAMPAIGN_ID = 42
     QUEST_HANDLERS = {
-        148: "handle_add_liquidity",
-        149: "handle_swap"
-    }
-    ENDPOINTS = {
-        "onchain": "/onchain/subgraph"
+        164: "handle_add_liquidity_euclid", # Add liquidity to the STT/EUCL pool (Euclid Protocol)
+        174: "handle_trade_nia", # Trade NIA token on Somnia Exchange
+        170: "handle_add_liquidity_quickswap", # Add Liquidity for any pair on Somnia Testnet (Quickswap)
+        169: "handle_swaps_quickswap", # Make 5 swaps on Quickswap on Somnia Testnet
+        173: "handle_launch_meme", # Launch a Meme on Somnex
+        172: "handle_trade_meme", # Trade on Somnex Meme
+        163: "handle_swaps_euclid", # Make 5 Swaps or more EuclidSwap on Somnia Testnet (Euclid Protocol)
+        171: "handle_trade_perpertual", # Trade on Somnex Perpertual
     }
 
     def __init__(self, account: Account) -> None:
@@ -397,22 +413,75 @@ class QuestDragonModule(BaseQuestModule):
             )
         )
 
-    async def _execute_onchain_verification(self, quest_id: int, operation: str) -> tuple[bool, str]:
-        return await self._send_verification_request(
-            quest_id=quest_id,
-            endpoint=self.ENDPOINTS["onchain"],
-            success_msg=f"Successfully {operation}",
-            error_msg=f"Failed {operation}"
+    def __init__(self, account: Account) -> None:
+        super().__init__(
+            account,
+            QuestConfig(
+                campaign_id=self.CAMPAIGN_ID,
+                quest_handlers=self.QUEST_HANDLERS
+            )
         )
     
-    @BaseQuestModule.safe_quest_handler
-    async def handle_swap(self) -> tuple[bool, str]:
-        success, _ = await process_swap(self.account)            
-        await random_sleep(self.wallet_address, **sleep_between_tasks)
-        return await self._execute_onchain_verification(149, "Quick Swap")
+    async def handle_add_liquidity_euclid(self) -> tuple[bool, str]:
+        return await self._send_verification_request(
+            quest_id=164,
+            endpoint="offchain/arbitrary-api",
+            success_msg=f"Successfully Add liquidity to the STT/EUCL pool (Euclid Protocol) verified",
+            error_msg=f"Failed verified Add liquidity to the STT/EUCL pool (Euclid Protocol)"
+        )
 
-    @BaseQuestModule.safe_quest_handler
-    async def handle_add_liquidity(self) -> tuple[bool, str]:
-        success, _ = await process_pool(self.account)            
-        await random_sleep(self.wallet_address, **sleep_between_tasks)
-        return await self._execute_onchain_verification(148, "Quick Add Liquidity")
+    async def handle_trade_nia(self) -> tuple[bool, str]:
+        return await self._send_verification_request(
+            quest_id=174,
+            endpoint="offchain/arbitrary-api",
+            success_msg=f"Successfully Trade NIA token on Somnia Exchange verified",
+            error_msg=f"Failed verified Trade NIA token on Somnia Exchange"
+        )
+    
+    async def handle_add_liquidity_quickswap(self) -> tuple[bool, str]:
+        return await self._send_verification_request(
+            quest_id=170,
+            endpoint="/onchain/subgraph",
+            success_msg=f"Successfully Add Liquidity for any pair on Somnia Testnet (Quickswap) verified",
+            error_msg=f"Failed verified Add Liquidity for any pair on Somnia Testnet (Quickswap)"
+        )
+    
+    async def handle_swaps_quickswap(self) -> tuple[bool, str]:
+        return await self._send_verification_request(
+            quest_id=169,
+            endpoint="/onchain/subgraph",
+            success_msg=f"Successfully Make 5 swaps on Quickswap on Somnia Testnet verified",
+            error_msg=f"Failed verified Make 5 swaps on Quickswap on Somnia Testnet"
+        )
+    
+    async def handle_launch_meme(self) -> tuple[bool, str]:
+        return await self._send_verification_request(
+            quest_id=173,
+            endpoint="offchain/arbitrary-api",
+            success_msg=f"Successfully Launch a Meme on Somnex verified",
+            error_msg=f"Failed verified Launch a Meme on Somnex"
+        )
+    
+    async def handle_trade_meme(self) -> tuple[bool, str]:
+        return await self._send_verification_request(
+            quest_id=172,
+            endpoint="offchain/arbitrary-api",
+            success_msg=f"Successfully Trade on Somnex Meme verified",
+            error_msg=f"Failed verified Trade on Somnex Meme"
+        )
+    
+    async def handle_swaps_euclid(self) -> tuple[bool, str]:
+        return await self._send_verification_request(
+            quest_id=163,
+            endpoint="offchain/arbitrary-api",
+            success_msg=f"Successfully Make 5 Swaps or more EuclidSwap on Somnia Testnet (Euclid Protocol) verified",
+            error_msg=f"Failed verified Make 5 Swaps or more EuclidSwap on Somnia Testnet (Euclid Protocol)"
+        )
+    
+    async def handle_trade_perpertual(self) -> tuple[bool, str]:
+        return await self._send_verification_request(
+            quest_id=171,
+            endpoint="offchain/arbitrary-api",
+            success_msg=f"Successfully Trade on Somnex Perpertual verified",
+            error_msg=f"Failed verified Trade on Somnex Perpertual"
+        )
