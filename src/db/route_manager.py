@@ -34,9 +34,7 @@ class RouteManager:
         "daily_gm",
         "community_nft",
         "somnia_domain",
-        "quest_somnia_horror",   
-        "quest_ruby_score",
-        "one_billion_quest"
+        "quest_sparkball_one",   
     ]
 
     DEPENDENCIES: dict[str, list[str]] = {
@@ -57,9 +55,7 @@ class RouteManager:
         "daily_gm": ["profile"],
         "community_nft": ["faucet"],
         "somnia_domain": ["faucet"],
-        "quest_somnia_horror": ["profile"],
-        "quest_ruby_score": ["profile"],
-        "one_billion_quest": ["profile"]
+        "quest_sparkball_one": ["profile"],
     }
     
     @staticmethod

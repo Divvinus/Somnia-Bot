@@ -6,9 +6,7 @@ from .ping_pong import MintPingPongModule, SwapPingPongModule
 from .mint_usdt import MintUsdtModule
 from .quills import QuillsMessageModule
 from .quets import (
-    QuestSomniaHorrorModule,
-    QuestRubyScoreModule,
-    Quest1BILLIONQUESTModule
+    QuestSparkballOne,
 )
 from .mint_air import MintairDeployContractModule
 from .onchain_gm import OnchainGMModule

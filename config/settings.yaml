@@ -14,12 +14,12 @@ threads: 1
 # en: Initial delay range before starting operations (seconds) | ru: Диапазон начальной задержки перед началом выполнения (секунды)
 delay_before_start:
     min: 1
-    max: 30
+    max: 100
 
 # en: Delay between tasks (seconds) | ru: Задержка между задачами (секунды)
 delay_between_tasks:
     min: 100
-    max: 150
+    max: 300
 
 #------------------------------------------------------------------------------
 # en: NETWORK CONFIGURATION | ru: КОНФИГУРАЦИЯ СЕТИ
@@ -60,22 +60,21 @@ always_run_tasks:
 # en: Available module names (copy needed modules to the list above)
 # ru: Доступные имена модулей (скопируйте нужные модули в список выше)
 available_modules:
-  - "profile"           # Профиль
-  - "faucet"            # Кран для получения токенов
-  - "transfer_stt"      # Перевод STT
-  - "mint_usdt"         # Минт USDT
-  - "mint_ping_pong"    # Минт Ping/Pong
-  - "swap_ping_pong"    # Обмен Ping/Pong
-  - "mint_message_nft"  # Минт NFT сообщения
-  - "mint_air"          # Минт контракта токена
-  - "onchain_gm"        # Onchain GM
-  - "shannon_nft"       # Shannon NFT
-  - "yappers_nft"       # Yappers NFT
-  - "mint_domen"        # Минт домена
-  - "nerzo_nft"         # Nerzo NFT
-  - "somni_nft"         # Минт Somni NFT
-  - "daily_gm"          # Ежедневный GM
-  - "community_nft"     # Community NFT
-  - "somnia_domain"     # Somnia Domain
-  - "quest_gamers"      # Gamers L.A.B
-  - "quest_dragon"      # Somniacs, feed the Dragon!
+  - "profile"                  # Профиль
+  - "faucet"                   # Кран для получения токенов
+  - "transfer_stt"             # Перевод STT
+  - "mint_usdt"                # Минт USDT
+  - "mint_ping_pong"           # Минт Ping/Pong
+  - "swap_ping_pong"           # Обмен Ping/Pong
+  - "mint_message_nft"         # Минт NFT сообщения
+  - "mint_air"                 # Минт контракта токена
+  - "onchain_gm"               # Onchain GM
+  - "shannon_nft"              # Shannon NFT
+  - "yappers_nft"              # Yappers NFT
+  - "mint_domen"               # Минт домена
+  - "nerzo_nft"                # Nerzo NFT
+  - "somni_nft"                # Минт Somni NFT
+  - "daily_gm"                 # Ежедневный GM
+  - "community_nft"            # Community NFT
+  - "somnia_domain"            # Somnia Domain
+  - "quest_sparkball_one"      # Who Dis? Sparkball !!
