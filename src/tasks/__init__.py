@@ -7,6 +7,7 @@ from .mint_usdt import MintUsdtModule
 from .quills import QuillsMessageModule
 from .quets import (
     QuestSparkballOne,
+    QuestSparkballThree
 )
 from .mint_air import MintairDeployContractModule
 from .onchain_gm import OnchainGMModule
@@ -15,7 +16,8 @@ from .mint_nft import (
     ShannonNFTModule, 
     NerzoNFTModule, 
     SomniNFTModule,
-    CommunityNFTModule
+    CommunityNFTModule,
+    BeaconNFTModule
 )
 from .mint_domen import MintDomenModule
 from .check_native_balance import CheckNativeBalanceModule

@@ -99,6 +99,11 @@ class SomniaBot:
         async with CommunityNFTModule(account) as module:
             return await module.run()
         
+    @staticmethod
+    async def process_beacon_nft(account: Account) -> tuple[bool, str]:
+        async with BeaconNFTModule(account) as module:
+            return await module.run()
+        
     # === Onchain operations ===
     @staticmethod
     async def process_swap(account: Account) -> tuple[bool, str]:
@@ -144,4 +149,9 @@ class SomniaBot:
     @staticmethod
     async def process_quest_sparkball_one(account: Account) -> tuple[bool, str]:
         async with QuestSparkballOne(account) as module:
+            return await module.run()
+        
+    @staticmethod
+    async def process_quest_sparkball_three(account: Account) -> tuple[bool, str]:
+        async with QuestSparkballThree(account) as module:
             return await module.run()

@@ -145,6 +145,11 @@ class SomniNFTContract(BaseContract):
     abi_file: str = "claim_nft.json"
     
 @dataclass(slots=True)
+class BeaconNFTContract(BaseContract):
+    address: str = AsyncWeb3.to_checksum_address("0x055ed4Be04Fad6BD5EeDc0A799E55b93210BCcf9")
+    abi_file: str = "claim_nft.json"
+    
+@dataclass(slots=True)
 class CommunityNFTContract(BaseContract):
     address: str = AsyncWeb3.to_checksum_address("0xFC79f0EaC5bEcf21fDcf037bAdb977b2b43DE497")
     abi_file: str = "community_nft.json"

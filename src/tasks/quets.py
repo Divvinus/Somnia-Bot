@@ -379,3 +379,27 @@ class QuestSparkballOne(BaseQuestModule):
             success_msg="Retweet Sparkball's announcement on X verified",
             error_msg=f"Failed verified Retweet Sparkball's announcement on X"
         )
+        
+
+class QuestSparkballThree(BaseQuestModule):
+    CAMPAIGN_ID = 48
+    QUEST_HANDLERS = {
+        185: "handle_create_nft",
+    }
+
+    def __init__(self, account: Account) -> None:
+        super().__init__(
+            account,
+            QuestConfig(
+                campaign_id=self.CAMPAIGN_ID,
+                quest_handlers=self.QUEST_HANDLERS
+            )
+        )
+    
+    async def handle_create_nft(self) -> tuple[bool, str]:        
+        return await self._send_verification_request(
+            quest_id=185,
+            endpoint="/onchain/nft-ownership",
+            success_msg="Create a NFT art of your Quills playing Sparkball verified",
+            error_msg=f"Failed verified Create a NFT art of your Quills playing Sparkball"
+        )

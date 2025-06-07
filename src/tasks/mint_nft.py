@@ -10,7 +10,8 @@ from src.models import (
     ShannonNFTContract, 
     NerzoNFTContract, 
     SomniNFTContract,
-    CommunityNFTContract
+    CommunityNFTContract,
+    BeaconNFTContract
 )
 from src.utils import show_trx_log, random_sleep
 from config.settings import MAX_RETRY_ATTEMPTS, RETRY_SLEEP_RANGE
@@ -114,6 +115,12 @@ class SomniNFTModule(BaseNFTMintModule):
 
     def __init__(self, account: Account) -> None:
         super().__init__(account, SomniNFTContract())
+        
+class BeaconNFTModule(BaseNFTMintModule):
+    module_name = "Beacon NFT"
+
+    def __init__(self, account: Account) -> None:
+        super().__init__(account, BeaconNFTContract())
         
 class CommunityNFTModule(Wallet, AsyncLogger):
     def __init__(self, account: Account) -> None:

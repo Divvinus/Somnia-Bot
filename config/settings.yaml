@@ -76,5 +76,7 @@ available_modules:
   - "somni_nft"                # Минт Somni NFT
   - "daily_gm"                 # Ежедневный GM
   - "community_nft"            # Community NFT
+  - "beacon_nft"               # Beacon NFT
   - "somnia_domain"            # Somnia Domain
   - "quest_sparkball_one"      # Who Dis? Sparkball !!
+  - "quest_sparkball_three"    # Create a NFT art of your Quills playing Sparkball
