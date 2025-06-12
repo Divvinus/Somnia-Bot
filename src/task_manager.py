@@ -147,11 +147,6 @@ class SomniaBot:
 
     # === Quests ===        
     @staticmethod
-    async def process_quest_sparkball_one(account: Account) -> tuple[bool, str]:
-        async with QuestSparkballOne(account) as module:
-            return await module.run()
-        
-    @staticmethod
-    async def process_quest_sparkball_three(account: Account) -> tuple[bool, str]:
-        async with QuestSparkballThree(account) as module:
+    async def process_quest_variance(account: Account) -> tuple[bool, str]:
+        async with QuestVariance(account) as module:
             return await module.run()

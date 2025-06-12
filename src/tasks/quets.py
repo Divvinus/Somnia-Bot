@@ -316,12 +316,11 @@ class BaseQuestModule(SomniaClient, ABC):
         return wrapper
     
         
-class QuestSparkballOne(BaseQuestModule):
-    CAMPAIGN_ID = 46
+class QuestVariance(BaseQuestModule):
+    CAMPAIGN_ID = 49
     QUEST_HANDLERS = {
-        180: "handle_follow_twitter_games",
-        179: "handle_follow_twitter_sparkball",
-        183: "handle_retweet_post"
+        186: "handle_follow_twitter_variance ",
+        188: "handle_retweet_post"
     }
 
     def __init__(self, account: Account) -> None:
@@ -334,72 +333,32 @@ class QuestSparkballOne(BaseQuestModule):
         )
     
     @BaseQuestModule.safe_quest_handler
-    async def handle_follow_twitter_games(self) -> tuple[bool, str]:
+    async def handle_follow_twitter_variance(self) -> tuple[bool, str]:
         async with TwitterWorker(self.account) as twitter_module:
-            result_follow = await twitter_module.follow_user(1920722477686431744)
+            result_follow = await twitter_module.follow_user(1777367417246961664)
             if not result_follow:
                 return False, "Failed to follow"
             
         await random_sleep(self.wallet_address, **sleep_between_tasks)
         
         return await self._send_verification_request(
-            quest_id=180,
+            quest_id=186,
             endpoint="/social/twitter/follow",
-            success_msg="Follow Somnia Games on X verified",
-            error_msg=f"Failed verified Follow Somnia Games on X"
-        )
-        
-    @BaseQuestModule.safe_quest_handler
-    async def handle_follow_twitter_sparkball(self) -> tuple[bool, str]:
-        async with TwitterWorker(self.account) as twitter_module:
-            result_follow = await twitter_module.follow_user(1537880021259280385)
-            if not result_follow:
-                return False, "Failed to follow"
-            
-        await random_sleep(self.wallet_address, **sleep_between_tasks)
-        
-        return await self._send_verification_request(
-            quest_id=179,
-            endpoint="/social/twitter/follow",
-            success_msg="Follow Sparkball on X verified",
-            error_msg=f"Failed verified Follow Sparkball on X"
+            success_msg="Follow Follow Variance on X verified",
+            error_msg=f"Failed verified Follow Variance on X"
         )
         
     @BaseQuestModule.safe_quest_handler
     async def handle_retweet_post(self) -> tuple[bool, str]:
         async with TwitterWorker(self.account) as twitter_module:
-            if not await twitter_module.retweet_tweet(1930610651942064516):
+            if not await twitter_module.retweet_tweet(1932847882111234339):
                 return False, "Retweet failed"
             
         await random_sleep(self.wallet_address, **sleep_between_tasks)
         
         return await self._send_verification_request(
-            quest_id=183,
+            quest_id=188,
             endpoint="/social/twitter/retweet",
-            success_msg="Retweet Sparkball's announcement on X verified",
-            error_msg=f"Failed verified Retweet Sparkball's announcement on X"
-        )
-        
-
-class QuestSparkballThree(BaseQuestModule):
-    CAMPAIGN_ID = 48
-    QUEST_HANDLERS = {
-        185: "handle_create_nft",
-    }
-
-    def __init__(self, account: Account) -> None:
-        super().__init__(
-            account,
-            QuestConfig(
-                campaign_id=self.CAMPAIGN_ID,
-                quest_handlers=self.QUEST_HANDLERS
-            )
-        )
-    
-    async def handle_create_nft(self) -> tuple[bool, str]:        
-        return await self._send_verification_request(
-            quest_id=185,
-            endpoint="/onchain/nft-ownership",
-            success_msg="Create a NFT art of your Quills playing Sparkball verified",
-            error_msg=f"Failed verified Create a NFT art of your Quills playing Sparkball"
+            success_msg="Retweet Variance's's announcement on X verified",
+            error_msg=f"Failed verified Retweet Variance's's announcement on X"
         )
