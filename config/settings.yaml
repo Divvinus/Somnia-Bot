@@ -78,4 +78,5 @@ available_modules:
   - "community_nft"            # Community NFT
   - "beacon_nft"               # Beacon NFT
   - "somnia_domain"            # Somnia Domain
-  - "quest_variance"           # Welcome Home, Variance <3
+  - "quest_pixcape"            # Pixcape Games
+  - "quest_shannonland"        # Get Your Shannonland ID

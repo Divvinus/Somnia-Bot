@@ -35,7 +35,8 @@ class RouteManager:
         "community_nft",
         "beacon_nft",
         "somnia_domain",
-        "quest_variance",  
+        "quest_pixcape",  
+        "quest_shannonland"
     ]
 
     DEPENDENCIES: dict[str, list[str]] = {
@@ -57,7 +58,8 @@ class RouteManager:
         "community_nft": ["faucet"],
         "beacon_nft": ["faucet"],
         "somnia_domain": ["faucet"],
-        "quest_variance": ["profile"],
+        "quest_pixcape": ["profile"],
+        "quest_shannonland": ["profile"]
     }
     
     @staticmethod

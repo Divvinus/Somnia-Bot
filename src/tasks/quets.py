@@ -316,11 +316,11 @@ class BaseQuestModule(SomniaClient, ABC):
         return wrapper
     
         
-class QuestVariance(BaseQuestModule):
-    CAMPAIGN_ID = 49
+class QuestPixcape(BaseQuestModule):
+    CAMPAIGN_ID = 51
     QUEST_HANDLERS = {
-        186: "handle_follow_twitter_variance ",
-        188: "handle_retweet_post"
+        197: "handle_like_and_retweet",
+        198: "handle_visit_page"
     }
 
     def __init__(self, account: Account) -> None:
@@ -331,34 +331,63 @@ class QuestVariance(BaseQuestModule):
                 quest_handlers=self.QUEST_HANDLERS
             )
         )
-    
-    @BaseQuestModule.safe_quest_handler
-    async def handle_follow_twitter_variance(self) -> tuple[bool, str]:
-        async with TwitterWorker(self.account) as twitter_module:
-            result_follow = await twitter_module.follow_user(1777367417246961664)
-            if not result_follow:
-                return False, "Failed to follow"
             
-        await random_sleep(self.wallet_address, **sleep_between_tasks)
+    @BaseQuestModule.safe_quest_handler
+    async def handle_like_and_retweet(self) -> tuple[bool, str]:
+        async with TwitterWorker(self.account) as twitter_module:
+            if not await twitter_module.retweet_tweet(1934627554385596577):
+                return False, "Like and Retweet failed"
+            
+            await random_sleep(self.wallet_address, **sleep_between_tasks)
+            
+            if not await twitter_module.like_tweet(1934627554385596577):
+                return False, "Like and Retweet failed"
+            
+            await random_sleep(self.wallet_address, **sleep_between_tasks)
         
         return await self._send_verification_request(
-            quest_id=186,
-            endpoint="/social/twitter/follow",
-            success_msg="Follow Follow Variance on X verified",
-            error_msg=f"Failed verified Follow Variance on X"
+            quest_id=197,
+            endpoint="/social/twitter/retweet",
+            success_msg="Like and Retweet Pixcape's announcement on X verified",
+            error_msg=f"Failed verified Like and Retweet Pixcape's announcement on X"
         )
         
-    @BaseQuestModule.safe_quest_handler
-    async def handle_retweet_post(self) -> tuple[bool, str]:
-        async with TwitterWorker(self.account) as twitter_module:
-            if not await twitter_module.retweet_tweet(1932847882111234339):
-                return False, "Retweet failed"
-            
-        await random_sleep(self.wallet_address, **sleep_between_tasks)
-        
+    async def handle_visit_page(self) -> tuple[bool, str]:        
         return await self._send_verification_request(
-            quest_id=188,
-            endpoint="/social/twitter/retweet",
-            success_msg="Retweet Variance's's announcement on X verified",
-            error_msg=f"Failed verified Retweet Variance's's announcement on X"
+            quest_id=198,
+            endpoint="/offchain/arbitrary-api",
+            success_msg="Visit the Pixscape Hive Invasion Playtest Page verified",
+            error_msg=f"Failed Visit the Pixscape Hive Invasion Playtest Page"
+        )
+        
+class QuestShannonland(BaseQuestModule):
+    CAMPAIGN_ID = 45
+    QUEST_HANDLERS = {
+        193: "handle_mint_id",
+        199: "handle_mint_domen"
+    }
+
+    def __init__(self, account: Account) -> None:
+        super().__init__(
+            account,
+            QuestConfig(
+                campaign_id=self.CAMPAIGN_ID,
+                quest_handlers=self.QUEST_HANDLERS
+            )
+        )
+        
+    async def handle_like_and_retweet(self) -> tuple[bool, str]:        
+        return await self._send_verification_request(
+            quest_id=193,
+            endpoint="/onchain/nft-ownership",
+            success_msg="Mint your unique Shannon ID verified",
+            error_msg=f"Failed verified Mint your unique Shannon ID"
+        )
+        
+    async def handle_mint_domen(self) -> tuple[bool, str]:        
+        return await self._send_verification_request(
+            quest_id=199,
+            endpoint="/offchain/arbitrary-api",
+            success_msg="Mint a Somnia Domain verified",
+            error_msg=f"Failed Mint a Somnia Domain"
         )

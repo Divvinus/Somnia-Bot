@@ -147,6 +147,11 @@ class SomniaBot:
 
     # === Quests ===        
     @staticmethod
-    async def process_quest_variance(account: Account) -> tuple[bool, str]:
-        async with QuestVariance(account) as module:
+    async def process_quest_pixcape(account: Account) -> tuple[bool, str]:
+        async with QuestPixcape(account) as module:
+            return await module.run()
+        
+    @staticmethod
+    async def process_quest_shannonland(account: Account) -> tuple[bool, str]:
+        async with QuestShannonland(account) as module:
             return await module.run()
