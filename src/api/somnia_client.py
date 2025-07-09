@@ -326,4 +326,20 @@ class SomniaClient(Wallet):
                 return
             path.write_text(entry, encoding="utf-8", append=False)
         except Exception as err:
-            raise SomniaClientError(f"Saving referral code failed: {err}")
+            raise SomniaClientError(f"Saving referral code failed: {err}")        
+        
+    async def get_is_bot(self) -> str:
+        try:
+            await self.onboarding()
+            response = await self.send_request(
+                request_type="GET",
+                method="/users/me",
+                headers=self._build_headers(),
+                verify=False,
+            )
+            if response.get("status_code") != 200 or not response.get("data"):
+                raise SomniaAPIError("Failed get_is_bot", response)
+            me_info = response["data"]
+            return me_info['isBot']
+        except Exception as err:
+            raise Exception(f"Error: {err}")

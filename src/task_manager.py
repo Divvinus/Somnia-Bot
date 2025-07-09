@@ -35,6 +35,18 @@ class SomniaBot:
                 return False, result
 
     @staticmethod
+    async def process_get_is_bot(account: Account) -> tuple[bool, str]:
+        wallet_address = get_address(account.private_key)
+        async with SomniaClient(account) as module:
+            bot = await module.get_is_bot()
+            if bot:
+                await logger.logger_msg(f"Bot", type_msg="error", address=wallet_address)
+                return False, bot
+            else:
+                await logger.logger_msg("You are eligible", type_msg="success", address=wallet_address)
+                return True, "success"
+            
+    @staticmethod
     async def process_get_referral_code(account: Account) -> tuple[bool, str]:
         wallet_address = get_address(account.private_key)
         async with SomniaClient(account) as module:
